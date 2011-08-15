@@ -1,0 +1,5 @@
+_history/
+*.local
+*~
+bin/*.exe
+dcu/*.dcu

@@ -1,0 +1,29 @@
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEOS VOS__WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "04090407"
+		BEGIN
+			VALUE "CompanyName", "PaganSoft\000"
+			VALUE "FileDescription", "Autotest for Delphi\000"
+			VALUE "FileVersion", "1.0.0.0\000"
+			VALUE "InternalName", "1.0.0.0 Revision 2632\000"
+			VALUE "LegalCopyright", "© 2011 PaganSoft\000"
+			VALUE "LegalTrademarks", "\000"
+			VALUE "OriginalFilename", "autotest4delphi.exe\000"
+			VALUE "ProductName", "Autotest for Delphi\000"
+			VALUE "ProductVersion", "1.0.0.0\000"
+			VALUE "Comments", "\000"
+			VALUE "Author", "Martin Gondermann\000"
+		END
+	END
+
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x0409 0x0407
+	END
+END
