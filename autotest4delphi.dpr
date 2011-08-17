@@ -2,15 +2,29 @@ program autotest4delphi;
 
 uses
   Forms,
-  AutoTestMainUnit in 'AutoTestMainUnit.pas' {MainForm},
   ActiveObjectEngine in 'ActiveObjectEngine.pas',
-  DirWatcher in 'DirWatcher.pas';
+  DirWatcher in 'DirWatcher.pas',
+  TestCommand in 'TestCommand.pas',
+  Elements in 'PassiveView\Elements.pas',
+  PassiveViewFramework in 'PassiveView\PassiveViewFramework.pas',
+  WinView in 'PassiveView\WinView.pas',
+  AutoTestMainUnit in 'views\AutoTestMainUnit.pas' {MainForm},
+  AutoTestMainController in 'controllers\AutoTestMainController.pas',
+  GrowlNotification in 'GrowlNotification.pas';
 
 {$R *.res}
 
-begin
+var
+  MainController : IController;
+
+  begin
   Application.Initialize;
   Application.Title := 'Autotest for Delphi';
-  Application.CreateForm(TMainForm, MainForm);
   Application.Run;
+  
+  MainController := TMainFormController.Create;
+  MainController.View := TMainForm.Create(Application);
+  MainController.Start;
+  WaitForView(MainController.View);
+  MainController.Stop;
 end.
