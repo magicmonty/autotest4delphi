@@ -1,5 +1,7 @@
 program autotest4delphi;
 
+{$R 'resources\resources.res' 'resources\resources.rc'}
+
 uses
   Forms,
   ActiveObjectEngine in 'ActiveObjectEngine.pas',
