@@ -3,8 +3,8 @@ object MainForm: TMainForm
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Autotest 4 Delphi'
-  ClientHeight = 97
-  ClientWidth = 486
+  ClientHeight = 123
+  ClientWidth = 476
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -13,6 +13,9 @@ object MainForm: TMainForm
   Font.Style = []
   OldCreateOrder = False
   Position = poScreenCenter
+  DesignSize = (
+    476
+    123)
   PixelsPerInch = 96
   TextHeight = 13
   object Label1: TLabel
@@ -29,46 +32,79 @@ object MainForm: TMainForm
     Height = 13
     Caption = 'Directory to watch:'
   end
+  object Label3: TLabel
+    Left = 8
+    Top = 62
+    Width = 97
+    Height = 13
+    Caption = 'Path to DCC32.exe:'
+  end
   object TestProjectEdit: TEdit
-    Left = 107
+    Left = 111
     Top = 5
-    Width = 344
+    Width = 330
     Height = 21
+    Anchors = [akLeft, akTop, akRight]
     TabOrder = 0
   end
   object StartStopButton: TButton
-    Left = 403
-    Top = 59
+    Left = 393
+    Top = 90
     Width = 75
     Height = 25
+    Anchors = [akRight, akBottom]
     Caption = 'Start'
     TabOrder = 1
+    ExplicitLeft = 403
+    ExplicitTop = 64
   end
   object SelectTestProjectButton: TButton
-    Left = 457
+    Left = 447
     Top = 5
     Width = 21
     Height = 21
+    Anchors = [akTop, akRight]
     Caption = '...'
     TabOrder = 2
+    ExplicitLeft = 457
   end
   object AddWatchedDirectoryButton: TButton
-    Left = 457
+    Left = 447
     Top = 32
     Width = 21
     Height = 21
+    Anchors = [akTop, akRight]
     Caption = '...'
     TabOrder = 3
+    ExplicitLeft = 457
   end
   object WatchedDirectoryEdit: TEdit
-    Left = 107
+    Left = 111
     Top = 32
-    Width = 344
+    Width = 330
     Height = 21
+    Anchors = [akLeft, akTop, akRight]
     TabOrder = 4
   end
+  object DCC32ExePathEdit: TEdit
+    Left = 111
+    Top = 59
+    Width = 330
+    Height = 21
+    Anchors = [akLeft, akTop, akRight]
+    TabOrder = 5
+  end
+  object SelectDCC32ExePathButton: TButton
+    Left = 447
+    Top = 59
+    Width = 21
+    Height = 21
+    Anchors = [akTop, akRight]
+    Caption = '...'
+    TabOrder = 6
+  end
   object PopupMenu1: TPopupMenu
-    Left = 56
+    Left = 64
     Top = 64
     object MI_Start: TMenuItem
       Caption = 'Start'

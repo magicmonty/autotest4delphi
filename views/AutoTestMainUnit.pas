@@ -36,6 +36,9 @@ type
     N1: TMenuItem;
     MI_Quit: TMenuItem;
     TrayIcon: TCoolTrayIcon;
+    Label3: TLabel;
+    DCC32ExePathEdit: TEdit;
+    SelectDCC32ExePathButton: TButton;
   private
     { Private-Deklarationen }
   public

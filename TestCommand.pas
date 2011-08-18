@@ -15,10 +15,10 @@ type
   private
     FEngine: TActiveObjectEngine;
     FTestProject: string;
-    FCount: Integer;
+    FDCC32Path: string;
     procedure ShowNotification(Title, Text: String; Icon: TNotificationType);
   public
-    constructor Create(Engine: TActiveObjectEngine; TestProject: string; Count: Integer);
+    constructor Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
     procedure Execute;
     function ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer): Boolean;
   end;
@@ -28,12 +28,12 @@ implementation
 uses
   SysUtils;
 
-constructor TTestCommand.Create(Engine: TActiveObjectEngine; TestProject: string; Count: Integer);
+constructor TTestCommand.Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
 begin
   inherited Create;
   FEngine := Engine;
   FTestProject := TestProject;
-  FCount := Count;
+  FDCC32Path := DCC32Path;
 end;
 
 procedure TTestCommand.Execute;
@@ -44,16 +44,21 @@ var
   balloonTitle, balloonHint: string;
   balloonIcon: TNotificationType;
 begin
-  balloonTitle := 'Change ' + IntToStr(FCount);
+  balloonTitle := 'Change';
   balloonHint := FTestProject;
 
   path := ExtractFilePath(FTestProject);
   if path[Length(path)] = '\' then
     SetLength(path, Length(path) - 1);
 
-  command := 'C:\Program Files (x86)\Borland\BDS\4.0\bin\dcc32.exe';
-  params := Format('-CC -DCONSOLE_TESTRUNNER -E%0:s\bin -N0%0:s\dcu -Q %1:s', [path, FTestProject]);
-  ExecAndWait(command, params, path, exitCode, errorCode);
+  if not DirectoryExists(path + '\bin') then
+    CreateDir(path + '\bin');
+  
+  if not DirectoryExists(path + '\dcu') then
+    CreateDir(path + '\dcu');
+
+  params := Format('-CC -DCONSOLE_TESTRUNNER;TEST;AUTOTEST -E%0:s\bin -N0%0:s\dcu -Q %1:s', [path, FTestProject]);
+  ExecAndWait(FDCC32Path, params, path, exitCode, errorCode);
   if (exitCode = 0)
   and (errorCode = 0) then
   begin
@@ -105,6 +110,13 @@ var
 begin
   AExitCode := 0;
   AErrorCode := 0;
+
+  if ExecuteFile[1] = '"' then
+    Delete(ExecuteFile, 1, 1);
+
+  if ExecuteFile[Length(ExecuteFile)] = '"' then
+    Delete(ExecuteFile, Length(ExecuteFile), 1);
+
 
   // Timeout muﬂ bei QVP und PDF als Application auf jeden Fall null sein.
   FillChar(startupInfo, SizeOf(TStartupInfo), 0);

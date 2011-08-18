@@ -12,7 +12,6 @@ uses
 type
   TMainFormController = class(TController)
   private
-    FCount: Integer;
     FDirWatcher: TDirectoryMonitor;
     FTestEngine: TActiveObjectEngine;
 
@@ -21,6 +20,8 @@ type
     FAddWatchedDirectoryButton: IViewElement;
     FTestProjectEdit: IEditElement;
     FWatchedDirectoryEdit: IEditElement;
+    FDCC32ExePathEdit: IEditElement;
+    FSelectDCC32ExePathButton: IViewElement;
 
     FStartMenuItem: IMenuItemElement;
     FStopMenuItem: IMenuItemElement;
@@ -30,6 +31,7 @@ type
 
     procedure SelectTestProjectButtonClick;
     procedure AddWatchedDirectoryButtonClick;
+    procedure SelectDCC32ExePathButtonClick;
     procedure StartButtonClick;
     procedure StopButtonClick;
     procedure QuitMenuItemClick;
@@ -104,6 +106,9 @@ begin
   FAddWatchedDirectoryButton.SetControlMethod(AddWatchedDirectoryButtonClick);
   FTestProjectEdit := View.GetViewElement('TestProjectEdit').AsEdit;
   FWatchedDirectoryEdit := View.GetViewElement('WatchedDirectoryEdit').AsEdit;
+  FDCC32ExePathEdit := View.GetViewElement('DCC32ExePathEdit').AsEdit;
+  FSelectDCC32ExePathButton := View.GetViewElement('SelectDCC32ExePathButton');
+  FSelectDCC32ExePathButton.SetControlMethod(SelectDCC32ExePathButtonClick);
 
   FStartMenuItem := View.GetComponent('MI_Start').AsMenuItem;
   FStartMenuItem.SetControlMethod(StartButtonClick);
@@ -122,6 +127,7 @@ begin
     reg.OpenKey('Software\Pagansoft\Autotest4Delphi', true);
     FTestProjectEdit.AsString := reg.ReadString('Testproject');
     FWatchedDirectoryEdit.AsString := reg.ReadString('WatchedDirectory');
+    FDCC32ExePathEdit.AsString := reg.ReadString('DCC32Exe');
   finally
     FreeAndNil(reg);
   end;
@@ -143,6 +149,24 @@ begin
       SetLength(dir, Length(dir) - 1);
 
     FWatchedDirectoryEdit.AsString := dir;
+  end;
+end;
+
+procedure TMainFormController.SelectDCC32ExePathButtonClick;
+var
+  openDialog: TOpenDialog;
+  path: string;
+begin
+  openDialog := TOpenDialog.Create(nil);
+  try
+    openDialog.DefaultExt := '.exe';
+    openDialog.Filter := 'dcc32.exe|dcc32.exe';
+    openDialog.FilterIndex := 1;
+    openDialog.Title := 'Select Borland Compiler';
+    if openDialog.Execute then
+      FDCC32ExePathEdit.AsString := openDialog.FileName;
+  finally
+    FreeAndNil(openDialog);
   end;
 end;
 
@@ -176,9 +200,9 @@ procedure TMainFormController.StartButtonClick;
 var
   reg: TRegistry;
 begin
-  FCount := 0;
   if FileExists(FTestProjectEdit.AsString)
-  and DirectoryExists(FWatchedDirectoryEdit.AsString) then
+  and DirectoryExists(FWatchedDirectoryEdit.AsString)
+  and FileExists(FDCC32ExePathEdit.AsString) then
   begin
     reg := TRegistry.Create;
     try
@@ -186,6 +210,7 @@ begin
       reg.OpenKey('Software\Pagansoft\Autotest4Delphi', true);
       reg.WriteString('Testproject', FTestProjectEdit.AsString);
       reg.WriteString('WatchedDirectory', FWatchedDirectoryEdit.AsString);
+      reg.WriteString('DCC32Exe', FDCC32ExePathEdit.AsString);
     finally
       FreeAndNil(reg);
     end;
@@ -245,8 +270,7 @@ begin
   begin
     if FTestEngine.Stopped or (not FTestEngine.Running and not FTestEngine.Executing) then
     begin
-      Inc(FCount);
-      FTestEngine.AddCommand(TTestCommand.Create(FTestEngine, FTestProjectEdit.AsString, FCount));
+      FTestEngine.AddCommand(TTestCommand.Create(FTestEngine, FTestProjectEdit.AsString, FDCC32ExePathEdit.AsString));
       if not FTestEngine.Running or FTestEngine.Stopped then
         FTestEngine.Run;
     end;
