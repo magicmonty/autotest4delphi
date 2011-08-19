@@ -4,3 +4,4 @@ _history/
 bin/*.exe
 dcu/*.dcu
 *.identcache
+/resources/resources.res
