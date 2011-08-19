@@ -3,7 +3,9 @@ unit PrjConst;
 interface
 
 const
-  CRLF = #13#10;
+  CR = #13;
+  LF = #10;
+  CRLF = CR + LF;
 
 implementation
 

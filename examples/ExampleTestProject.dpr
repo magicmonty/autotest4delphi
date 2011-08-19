@@ -1,4 +1,4 @@
-program MDS4DvTests;
+program ExampleTestProject;
 {$IFDEF CONSOLE_TESTRUNNER}
 {$APPTYPE CONSOLE}
 {$ENDIF}
@@ -8,59 +8,87 @@ uses
   SysUtils,
   TestFramework,
   TestModules,
-  GUITestRunner;
-  
-const
-  SwitchChars = ['-','/'];
+  GUITestRunner,
+  XmlTestRunner in 'XmlTestRunner.pas';
 
 var
-  ConfigFile : string;
   OutputFile : string = DEFAULT_FILENAME;
 
-procedure LoadTests(const FileMask : string);
 var
-  srec : TSearchRec;
-begin
-  if FindFirst(FileMask, faAnyFile, srec) = 0 then
-    repeat
-      RegisterModuleTests(srec.Name);
-      WriteLn('Loaded module ' + srec.Name);
-    until FindNext(srec) <> 0;
-  FindClose(srec);
-end;
-
-procedure ProcessCommandLine;
-var
-  i : Integer;
-  s : string;
-begin
-  for i := 1 to ParamCount do begin
-    s := ParamStr(i);
-    if not (s[1] in SwitchChars) then
-      LoadTests(s)
-    else begin
-      if CompareText(Copy(s, 2, 2), 'c=') = 0 then
-        ConfigFile := Copy(s, 4, Length(s))
-      else
-      if CompareText(Copy(s, 2, 2), 'o=') = 0 then
-        OutputFile := Copy(s, 4, Length(s));
-    end;
-  end;
-end;
+  testResult: TTestResult;
+  testFailure: TTestFailure;
+  i: Integer;
+  runCount, warningCount, failureCount, errorCount: Integer;
+  tmp: string;
 
 begin
   if IsConsole then
   begin
     try
-      WriteLn('DUnit Console');
-      ProcessCommandLine;
-      if ConfigFile <> '' then begin
-        RegisteredTests.LoadConfiguration(ConfigFile, False, True);
-        WriteLn('Loaded config file ' + ConfigFile);
+      testResult := XMLTestRunner.RunRegisteredTests(OutputFile);
+
+      try
+        runCount := testResult.RunCount;
+      except
+        runCount := 0;
       end;
-      WriteLn('Writing output to ' + OutputFile);
-      WriteLn('Running ' + IntToStr(RegisteredTests.CountEnabledTestCases) + ' of ' + IntToStr(RegisteredTests.CountTestCases) + ' test cases');
-      if not XMLTestRunner.RunRegisteredTests(OutputFile).WasSuccessful then
+
+      try
+        warningCount := testResult.WarningCount;
+      except
+        warningCount := 0;
+      end;
+
+      try
+        if not testResult.WasSuccessful then
+          failureCount := testResult.FailureCount
+        else
+          failureCount := 0;
+      except
+        failureCount := 0;
+      end;
+
+      try
+        if not testResult.WasSuccessful then
+          errorCount := testResult.ErrorCount
+        else
+          errorCount := 0;
+      except
+        errorCount := 0;
+      end;
+
+      WriteLn('Run: ' + IntToStr(runCount) + ' / Warnings: ' + IntToStr(warningCount) + ' / Failures: ' + IntToStr(failureCount) + ' / Errors: ' + IntToStr(errorCount) );
+      if failureCount > 0 then
+      begin
+        Writeln('Failures:');
+        for i := 0 to failureCount - 1 do
+        begin
+          testFailure := testResult.Failures[i];
+          tmp := testFailure.FailedTest.Name;
+          if Trim(testFailure.LocationInfo) <> EmptyStr then
+            tmp := tmp + ' (' + testFailure.LocationInfo + ')';
+          tmp := tmp + ': ' + testFailure.ThrownExceptionMessage;
+
+          Writeln(tmp);
+        end;
+      end;
+
+      if errorCount > 0 then
+      begin
+        Writeln('Errors:');
+        for i := 0 to errorCount - 1 do
+        begin
+          testFailure := testResult.Errors[i];
+          tmp := testFailure.FailedTest.Name;
+          if Trim(testFailure.LocationInfo) <> EmptyStr then
+            tmp := tmp + ' (' + testFailure.LocationInfo + ')';
+          tmp := tmp + ': ' + testFailure.ThrownExceptionMessage;
+
+          Writeln(tmp);
+        end;
+      end;
+
+      if not testResult.WasSuccessful then
         Halt(1);
     except
       on e:Exception do

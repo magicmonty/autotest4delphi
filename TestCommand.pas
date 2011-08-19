@@ -3,6 +3,7 @@ unit TestCommand;
 interface
 
 uses
+  Forms,
   GrowlNotification,
   Windows,
   CoolTrayIcon,
@@ -20,13 +21,14 @@ type
   public
     constructor Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
     procedure Execute;
-    function ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer): Boolean;
+    function ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer; var Output: string): Boolean;
   end;
 
 implementation
 
 uses
-  SysUtils;
+  SysUtils,
+  PrjConst;
 
 constructor TTestCommand.Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
 begin
@@ -41,11 +43,11 @@ var
   command, params, path: string;
   exitCode: Cardinal;
   errorCode: Integer;
-  balloonTitle, balloonHint: string;
+  balloonTitle: string;
   balloonIcon: TNotificationType;
+  output: string;
 begin
   balloonTitle := 'Change';
-  balloonHint := FTestProject;
 
   path := ExtractFilePath(FTestProject);
   if path[Length(path)] = '\' then
@@ -58,13 +60,13 @@ begin
     CreateDir(path + '\dcu');
 
   params := Format('-CC -DCONSOLE_TESTRUNNER;TEST;AUTOTEST -E%0:s\bin -N0%0:s\dcu -Q %1:s', [path, FTestProject]);
-  ExecAndWait(FDCC32Path, params, path, exitCode, errorCode);
+  ExecAndWait(FDCC32Path, params, path, exitCode, errorCode, output);
   if (exitCode = 0)
   and (errorCode = 0) then
   begin
     command := Format('%s\bin\%s', [path, StringReplace(ExtractFileName(FTestProject), '.dpr', '.exe', [rfReplaceAll, rfIgnoreCase])]);
     params := '';
-    ExecAndWait(command, params, path, exitCode, errorCode);
+    ExecAndWait(command, params, path, exitCode, errorCode, output);
     if (exitCode = 0)
     and (errorCode = 0) then
     begin
@@ -81,10 +83,9 @@ begin
   begin
     balloonIcon := ntError;
     balloonTitle := 'Build error';
-    balloonHint := 'Error building test project';
   end;
 
-  ShowNotification(balloonTitle, balloonHint, balloonIcon);
+  ShowNotification(balloonTitle, output, balloonIcon);
 end;
 
 procedure TTestCommand.ShowNotification(Title, Text: String; Icon: TNotificationType);
@@ -94,7 +95,7 @@ begin
   notifier := TGrowlNotification.Create;
   try
     try
-      notifier.SendNotification(Title, Text, icon);
+      notifier.SendNotification(Title, Trim(StringReplace(Text, CRLF, LF, [rfReplaceAll])), icon);
     except
     end;
   finally
@@ -102,12 +103,20 @@ begin
   end;
 end;
 
-function TTestCommand.ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer): Boolean;
+function TTestCommand.ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer; var Output: string): Boolean;
+const
+  C_READ_BUFFER = 2400;
 var
   processInfo: TProcessInformation;
   startupInfo: TStartupInfo;
   commandLine: AnsiString;
+  security: TSecurityAttributes;
+  readPipe, writePipe: THandle;
+  buffer: PChar;
+  appRunning: DWORD;
+  bytesRead: DWORD;
 begin
+  Output := EmptyStr;
   AExitCode := 0;
   AErrorCode := 0;
 
@@ -117,44 +126,73 @@ begin
   if ExecuteFile[Length(ExecuteFile)] = '"' then
     Delete(ExecuteFile, Length(ExecuteFile), 1);
 
-
-  // Timeout muﬂ bei QVP und PDF als Application auf jeden Fall null sein.
-  FillChar(startupInfo, SizeOf(TStartupInfo), 0);
-  startupInfo.cb := SizeOf(TStartupInfo);
-  startupInfo.dwFlags := STARTF_USESHOWWINDOW;
-  startupInfo.wShowWindow := SW_HIDE;
-  commandLine := Format('"%s" %s', [ExecuteFile, ParamString]);
-
-  if StartInDirectory = EmptyStr then
-    StartInDirectory := ExtractFilePath(ExecuteFile);
-
-  if CreateProcess(nil,
-    PChar(commandLine),
-    nil,
-    nil,
-    false,
-    NORMAL_PRIORITY_CLASS,
-    nil,
-    PChar(StartInDirectory),
-    startupInfo,
-    processInfo) then
+  with security do
   begin
-    Result := true;
+    nLength := SizeOf(TSecurityAttributes);
+    bInheritHandle := true;
+    lpSecurityDescriptor := nil;
+  end;
 
-    if WaitForSingleObject(processInfo.hProcess, 120 * 1000) = WAIT_FAILED then
-      AErrorCode := 1;
+  if CreatePipe(readPipe, writePipe, @security, 0) then
+  begin
+    buffer := AllocMem(C_READ_BUFFER + 1);
 
-    if AErrorCode = 0 then
-      GetExitCodeProcess(processInfo.hProcess, AExitCode)
+    // Timeout muﬂ bei QVP und PDF als Application auf jeden Fall null sein.
+    FillChar(startupInfo, SizeOf(TStartupInfo), 0);
+    startupInfo.cb := SizeOf(TStartupInfo);
+    startupInfo.hStdInput := readPipe;
+    startupInfo.hStdOutput := writePipe;
+    startupInfo.hStdError := writePipe;
+    startupInfo.dwFlags := STARTF_USESTDHANDLES + STARTF_USESHOWWINDOW;
+    startupInfo.wShowWindow := SW_HIDE;
+    commandLine := Format('"%s" %s', [ExecuteFile, ParamString]);
+
+    if StartInDirectory = EmptyStr then
+      StartInDirectory := ExtractFilePath(ExecuteFile);
+
+    if CreateProcess(nil,
+      PChar(commandLine),
+      @security,
+      @security,
+      true,
+      NORMAL_PRIORITY_CLASS,
+      nil,
+      PChar(StartInDirectory),
+      startupInfo,
+      processInfo) then
+    begin
+      Result := true;
+
+      repeat
+        appRunning := WaitForSingleObject(processInfo.hProcess, 100);
+        Application.ProcessMessages;
+      until (appRunning <> WAIT_TIMEOUT);
+
+      repeat
+        bytesRead := 0;
+        ReadFile(readPipe, buffer[0], C_READ_BUFFER, bytesRead, nil);
+        buffer[bytesRead] := #0;
+        OemToAnsi(buffer, buffer);
+        Output := Output + string(buffer);
+      until bytesRead < C_READ_BUFFER;
+
+      FreeMem(buffer);
+
+      if AErrorCode = 0 then
+        GetExitCodeProcess(processInfo.hProcess, AExitCode)
+      else
+        AExitCode := 0;
+
+      CloseHandle(processInfo.hProcess);
+      CloseHandle(processInfo.hThread);
+      CloseHandle(readPipe);
+      CloseHandle(writePipe);
+    end
     else
-      AExitCode := 0;
-
-    CloseHandle(processInfo.hProcess);
-  end
-  else
-  begin
-    Result := false;
-    AErrorCode := 2;
+    begin
+      Result := false;
+      AErrorCode := 2;
+    end;
   end;
 end;
 
