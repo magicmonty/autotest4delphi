@@ -12,7 +12,8 @@ uses
   WinView in 'PassiveView\WinView.pas',
   AutoTestMainUnit in 'views\AutoTestMainUnit.pas' {MainForm},
   AutoTestMainController in 'controllers\AutoTestMainController.pas',
-  GrowlNotification in 'GrowlNotification.pas';
+  GrowlNotification in 'GrowlNotification.pas',
+  PrjConst in 'PrjConst.pas';
 
 {$R *.res}
 

@@ -3,8 +3,6 @@ unit GrowlNotification;
 interface
 
 uses
-  Dialogs,
-
   Classes;
 
 type
@@ -21,6 +19,13 @@ type
     procedure SendNotification(Title, Text: string; NotificationType: TNotificationType);
   end;
 
+  TSendCommand = class(TThread)
+  private
+    FDataString: AnsiString;
+  public
+    constructor Create(DataString: AnsiString);
+    procedure Execute; override;
+  end;
 implementation
 
 uses
@@ -28,10 +33,8 @@ uses
   SysUtils,
   DecHash,
   DecFmt,
-  IdTcpClient;
-
-const
-  CRLF = #13#10;
+  IdTcpClient,
+  PrjConst;
 
 procedure TGrowlNotification.RegisterApplication;
 var
@@ -91,18 +94,8 @@ begin
 end;
 
 procedure TGrowlNotification.SendCommand(Command: TStringStream);
-var
-  client: TIdTCPClient;
 begin
-  client := TIdTCPClient.Create(nil);
-  try
-    client.Host := '127.0.0.1';
-    client.Port := 23053;
-    client.Connect;
-    client.SendCmd(Command.DataString);
-  finally
-    FreeAndNil(client);
-  end;
+  TSendCommand.Create(command.DataString);
 end;
 
 procedure TGrowlNotification.SendNotification(Title, Text: string; NotificationType: TNotificationType);
@@ -169,6 +162,37 @@ begin
     end;
   except
     Result := '';
+  end;
+end;
+
+{ TSendCommand }
+
+constructor TSendCommand.Create(DataString: AnsiString);
+begin
+  inherited Create(true);
+  FreeOnTerminate := true;
+  FDataString := DataString;
+  Resume;
+end;
+
+procedure TSendCommand.Execute;
+var
+  client: TIdTCPClient;
+begin
+  client := TIdTCPClient.Create(nil);
+  try
+    client.Host := '127.0.0.1';
+    client.Port := 23053;
+    client.ConnectTimeout := 10;
+    client.Connect;
+    if client.Connected then
+      client.SendCmd(FDataString);
+  finally
+    try
+      client.Disconnect;
+    finally
+      FreeAndNil(client);
+    end;
   end;
 end;
 
