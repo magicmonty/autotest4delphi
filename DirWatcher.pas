@@ -182,12 +182,11 @@ procedure TDirectoryMonitorWorkerThread.Execute;
 var
   bytesRead: DWORD;
   FNI: PFileNotifyInformation;
-  offset, nextOffset: DWORD;
+  nextOffset: DWORD;
   buffer: array[0 .. MAX_BUFFER - 1] of byte;
   overlap: TOverlapped;
   events: array[0..1] of THandle;
   waitResult: DWORD;
-  s: AnsiString;
 begin
   if FDirHandle <> INVALID_HANDLE_VALUE then
   begin
@@ -214,7 +213,6 @@ begin
         if waitResult = WAIT_OBJECT_0 then
         begin
            FNI := @buffer[0];
-          offset := 0;
           repeat
             nextOffset := FNI.NextEntryOffset;
             FNotifyFileName := WideCharLenToString(@FNI.FileName, FNI.FileNameLength);
@@ -223,7 +221,6 @@ begin
             Synchronize(DoOnDirectoryChange);
 
             PByte(FNI) := PByte(DWORD(FNI) + nextOffset);
-            offset := offset + nextOffset;
           until (nextOffset = 0) or Terminated;
         end;
       end;
