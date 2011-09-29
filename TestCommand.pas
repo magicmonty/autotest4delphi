@@ -17,7 +17,7 @@ type
     FEngine: TActiveObjectEngine;
     FTestProject: string;
     FDCC32Path: string;
-    procedure ShowNotification(Title, Text: String; Icon: TNotificationType);
+    procedure ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
   public
     constructor Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
     procedure Execute;
@@ -27,6 +27,7 @@ type
 implementation
 
 uses
+  Classes,
   SysUtils,
   PrjConst;
 
@@ -46,6 +47,8 @@ var
   balloonTitle: string;
   balloonIcon: TNotificationType;
   output: string;
+  text: string;
+  tmp: TStringList;
 begin
   balloonTitle := 'Change';
 
@@ -85,16 +88,58 @@ begin
     balloonTitle := 'Build error';
   end;
 
-  ShowNotification(balloonTitle, output, balloonIcon);
+  text := output;
+  
+  if balloonIcon = ntError then
+    text := balloonTitle
+  else if balloonIcon = ntFailure then
+  begin
+    tmp := TStringList.Create;
+    try
+      tmp.Text := output;
+      if tmp.Count > 0 then
+      begin
+        text := tmp.Strings[0];
+        tmp.Delete(0);
+        output := tmp.Text;
+      end
+      else
+        text := balloonTitle;
+    finally
+      FreeAndNil(tmp);
+    end;
+  end
+  else
+    output := EmptyStr;
+
+
+  ShowNotification(balloonTitle, text, output, balloonIcon);
 end;
 
-procedure TTestCommand.ShowNotification(Title, Text: String; Icon: TNotificationType);
+procedure TTestCommand.ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
 var
   notifier: TGrowlNotification;
 begin
   notifier := TGrowlNotification.Create;
   try
     try
+      try
+        if Icon = ntSuccess then
+          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN)
+        else
+          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
+
+        Writeln(Text);
+        if Trim(ConsoleOutput) <> EmptyStr then
+        begin
+          Writeln;
+          Writeln(ConsoleOutput);
+        end;
+
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED or FOREGROUND_GREEN or FOREGROUND_BLUE);
+      except
+      end;
+
       notifier.SendNotification(Title, Trim(StringReplace(Text, CRLF, LF, [rfReplaceAll])), icon);
     except
     end;
@@ -116,6 +161,7 @@ var
   appRunning: DWORD;
   bytesRead: DWORD;
 begin
+  Result := true;
   Output := EmptyStr;
   AExitCode := 0;
   AErrorCode := 0;
