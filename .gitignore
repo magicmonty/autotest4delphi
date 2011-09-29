@@ -2,6 +2,8 @@ _history/
 *.local
 *~
 bin/*.exe
+bin/*.ini
 dcu/*.dcu
 *.identcache
 /resources/resources.res
+/__history
