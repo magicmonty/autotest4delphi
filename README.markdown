@@ -47,6 +47,15 @@ for example:
     DirectoryToWatch=C:\Program Files (x86)\Borland\BDS\4.0\bin\dcc32.exe
 
 
+Command line parameters
+---
+
+The autotest4delphi.exe accepts now an optional parameter with the path to the autotes.ini file.
+e.g.
+
+`autotest4delphi.exe "C:\Test Project\autotest.ini"
+
+
 P.S.:
 
 I apologize for not having done TDD for this project ;)
