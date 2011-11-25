@@ -62,6 +62,9 @@ begin
   FDirWatcher.OnDirectoryChange := FDirWatcherOnDirectoryChange;
   FDirWatcher.Start;
 
+  FTestEngine.AddCommand(TTestCommand.Create(FTestEngine, FTestProject, FDCC32ExePath));
+  FTestEngine.Run;
+
   while not Terminated do
     Sleep(100);
 end;
