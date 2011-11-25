@@ -62,7 +62,7 @@ begin
   if not DirectoryExists(path + '\dcu') then
     CreateDir(path + '\dcu');
 
-  params := Format('-CC -DCONSOLE_TESTRUNNER;TEST;AUTOTEST -E%0:s\bin -N0%0:s\dcu -Q %1:s', [path, FTestProject]);
+  params := Format('-CC -DCONSOLE_TESTRUNNER;TEST;AUTOTEST -E"%0:s\bin" -N0"%0:s\dcu" -Q "%1:s"', [path, FTestProject]);
   ExecAndWait(FDCC32Path, params, path, exitCode, errorCode, output);
   if (exitCode = 0)
   and (errorCode = 0) then
