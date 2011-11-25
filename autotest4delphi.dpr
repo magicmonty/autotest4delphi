@@ -47,11 +47,19 @@ end;
 function LoadIni: Byte;
 var
   ini: TMemInifile;
+  iniFileName: AnsiString;
 begin
-  if FileExists(C_INI_NAME) then
+  iniFileName := EmptyStr;
+  
+  if (ParamCount = 1) then
+    iniFileName := ParamStr(1)
+  else
+    iniFileName := C_INI_NAME;
+
+  if FileExists(iniFileName) then
   begin
     try
-      ini := TMemIniFile.Create(C_INI_NAME);
+      ini := TMemIniFile.Create(iniFileName);
       if ini.SectionExists(C_INI_SECTION) then
       begin
         if ini.ValueExists(C_INI_SECTION, 'TestProject') then
