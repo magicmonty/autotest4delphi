@@ -12,6 +12,8 @@ const
   MAX_BUFFER = 65536;
   CM_DIRECTORY_EVENT = WM_USER + 4242;
 
+  FILE_LIST_DIRECTORY = 0;
+
 type
   TFileNotifyInformation = record
     NextEntryOffset: DWORD;
@@ -36,14 +38,14 @@ type
 
   TDirectoryAction = (daUnknown, daFileAdded, daFileRemoved, daFileModified, daFileRenamedOldName, daFileRenamedNewName);
 
-  TDirectoryChangeEvent = procedure(Sender: TObject; Action: TDirectoryAction; FileName: AnsiString) of object;
+  TDirectoryChangeEvent = procedure(Sender: TObject; Action: TDirectoryAction; FileName: string) of object;
 
 
 
   TDirectoryMonitorWorkerThread = class(TThread)
   private
     FWatchSubFolders: Boolean;
-    FPathToWatch: AnsiString;
+    FPathToWatch: string;
     FActionsToWatch: TActionsToWatch;
     FNotifyMask: DWORD;
     FDirHandle: THandle;
@@ -55,7 +57,7 @@ type
     FOnDirectoryChange: TDirectoryChangeEvent;
 
 
-    FNotifyFileName: AnsiString;
+    FNotifyFileName: string;
     FNotifyAction: TDirectoryAction;
 
     procedure DoOnDirectoryChange;
@@ -64,27 +66,28 @@ type
   public
     property OnDirectoryChange: TDirectoryChangeEvent read FOnDirectoryChange write FOnDirectoryChange;
     
-    constructor Create(const PathToWatch: AnsiString; ActionsToWatch: TActionsToWatch; WatchSubFolders: Boolean);
+    constructor Create(const PathToWatch: string; ActionsToWatch: TActionsToWatch; WatchSubFolders: Boolean);
     destructor Destroy; override;
 
     procedure Execute; override;
     procedure ShutDown;
   end;
 
+  {$M+}
   TDirectoryMonitor = class
   private
-    FDirectoryToWatch: AnsiString;
+    FDirectoryToWatch: string;
     FWorkerThread: TDirectoryMonitorWorkerThread;
     FOnDirectoryChange: TDirectoryChangeEvent;
     FOptions: TActionsToWatch;
     FWatchSubFolders: Boolean;
     FRunning: Boolean;
 
-    procedure SetDirToWatch(Value: AnsiString);
-    procedure DoOnDirectoryChange(Sender: TObject; Action: TDirectoryAction; FileName: AnsiString);
+    procedure SetDirToWatch(const Value: string);
+    procedure DoOnDirectoryChange(Sender: TObject; Action: TDirectoryAction; FileName: string);
   public
     property WorkerThread: TDirectoryMonitorWorkerThread read FWorkerThread;
-    property DirectoryToWatch: AnsiString read FDirectoryToWatch write SetDirToWatch;
+    property DirectoryToWatch: string read FDirectoryToWatch write SetDirToWatch;
   published
     property OnDirectoryChange: TDirectoryChangeEvent read FOnDirectoryChange write FOnDirectoryChange;
     property Options: TActionsToWatch read FOptions write FOptions;
@@ -96,15 +99,13 @@ type
     constructor Create;
     destructor Destroy; override;
   end;
+  {$M-}
 
 
 implementation
 
-uses
-  JclWin32;
-
 {$region 'TDirectoryMonitorWorkerThread'}
-constructor TDirectoryMonitorWorkerThread.Create(const PathToWatch: AnsiString;
+constructor TDirectoryMonitorWorkerThread.Create(const PathToWatch: string;
                                                  ActionsToWatch: TActionsToWatch;
                                                  WatchSubFolders: Boolean);
 begin
@@ -283,7 +284,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TDirectoryMonitor.DoOnDirectoryChange(Sender: TObject; Action: TDirectoryAction; FileName: AnsiString);
+procedure TDirectoryMonitor.DoOnDirectoryChange(Sender: TObject; Action: TDirectoryAction; FileName: string);
 begin
   if Assigned(FOnDirectoryChange) then
   try
@@ -292,7 +293,7 @@ begin
   end;
 end;
 
-procedure TDirectoryMonitor.SetDirToWatch(Value: AnsiString);
+procedure TDirectoryMonitor.SetDirToWatch(const Value: string);
 var
   wasRunning: Boolean;
 begin

@@ -7,3 +7,8 @@ dcu/*.dcu
 *.identcache
 /resources/resources.res
 /__history
+
+*.dproj.2007
+/resources.res
+/ExeIcon.res
+/VersionInfo.res
