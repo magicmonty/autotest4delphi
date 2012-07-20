@@ -6,7 +6,6 @@ uses
   Forms,
   GrowlNotification,
   Windows,
-  CoolTrayIcon,
   ActiveObjectEngine;
 
 type
@@ -21,7 +20,11 @@ type
   public
     constructor Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
     procedure Execute;
-    function ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer; var Output: string): Boolean;
+    function ExecAndWait(
+      ExecuteFile, ParamString, StartInDirectory: string;
+      var AExitCode: DWORD;
+      var AErrorCode: Integer;
+      var Output: string): Boolean;
   end;
 
 implementation
@@ -148,16 +151,20 @@ begin
   end;
 end;
 
-function TTestCommand.ExecAndWait(ExecuteFile, ParamString, StartInDirectory: AnsiString; var AExitCode: DWORD; var AErrorCode: Integer; var Output: string): Boolean;
+function TTestCommand.ExecAndWait(
+  ExecuteFile, ParamString, StartInDirectory: string;
+  var AExitCode: DWORD;
+  var AErrorCode: Integer;
+  var Output: string): Boolean;
 const
   C_READ_BUFFER = 2400;
 var
   processInfo: TProcessInformation;
   startupInfo: TStartupInfo;
-  commandLine: AnsiString;
+  commandLine: string;
   security: TSecurityAttributes;
   readPipe, writePipe: THandle;
-  buffer: PChar;
+  buffer: PAnsiChar;
   appRunning: DWORD;
   bytesRead: DWORD;
 begin
