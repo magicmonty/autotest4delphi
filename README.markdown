@@ -33,11 +33,14 @@ The Ini-File
 ---
 
 The Ini-File is a simple text file named `autotest.ini`.
-It must consist of a section [autotest] and has three entries:
+It must consist of a section [autotest] and has the following:
 
+* **DirectoryToWatch** (required) - This is the directory which will be watched for changes. All subdirectories will be watched too.
 * **TestProject** - This is the path to the .dpr-File with the DUnit-Test project
-* **DirectoryToWatch** - This is the directory which will be watched for changes. All subdirectories will be watched too.
 * **DCC32Exe** - This is the path to the dcc32.exe for compiling the test project.
+* **UseBuildXML** - if this is set to 1, and the entry **BuildXMLPath** exists and the file exists, then the configuration for the build and the test will be read from there
+** if this is set, the settings **TestProject** and **DCC32Exe** will be ignored
+* **BuildXMLPath** - this is the full path to an xml file with the configuration in it
 
 for example:
 
@@ -46,6 +49,35 @@ for example:
     DirectoryToWatch=C:\Projects\MyAwesomeProject
     DCC32Exe=C:\Program Files (x86)\Borland\BDS\4.0\bin\dcc32.exe
 
+Format of the build.xmö
+---
+The build.xml must lie in the same folder where the test project is located.
+It has the following format:
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <buildrunner>
+      <environment>
+        <!-- Here you can set Environment variables -->
+        <BDS>%ProgramFiles%\CodeGear\RadStudio\6.0</BDS>
+        <BDSCOMMONDIR />
+        <FrameworkDir>%WINDIR%\Microsoft.NET\Framework64\</FrameworkDir>
+        <FrameworkVersion>v2.0.50727</FrameworkVersion>
+        <FrameworkSDKDir></FrameworkSDKDir>
+        <Path>%FrameworkDir%%FrameworkVersion%;%FrameworkSDKDir%;%Path%</Path>
+      </environment>
+      <build>
+        <command>msbuild.exe</command>
+        <params>/nologo /verbosity:quiet /p:config=Release MyTests.dproj</params>
+      </build>
+      <test>
+        <!-- 
+          for the test command it is needed, that the full path is specified 
+          %CD% is replaced with the path of the build.xml
+        -->
+        <command>%CD%\bin\MyTests.exe</command>
+        <params></params>
+      </test>
+    </buildrunner>
 
 Command line parameters
 ---

@@ -1,6 +1,8 @@
 program autotest4delphi;
 
-{$R 'resources\resources.res' 'resources\resources.rc'}
+{$R 'resources.res' 'resources\resources.rc'}
+{$R 'ExeIcon.res' 'ExeIcon.rc'}
+{$R 'VersionInfo.res' 'VersionInfo.rc'}
 {$APPTYPE Console}
 
 uses
@@ -13,15 +15,17 @@ uses
   TestCommand in 'TestCommand.pas',
   GrowlNotification in 'GrowlNotification.pas',
   PrjConst in 'PrjConst.pas',
-  AutoTestThread in 'AutoTestThread.pas';
+  AutoTestThread in 'AutoTestThread.pas',
+  MSBuildCommand in 'MSBuildCommand.pas';
 
-{$R *.res}
 var
   // MainController : IController;
   FAutoTestThread: TAutoTestThread;
   FTestProject: string;
   FDirectoryToWatch: string;
   FDCC32ExePath: string;
+  FUseBuildXML: Boolean;
+  FBuildXMLFilePath: string;
   FTerminate: Boolean;
   LoadResult: Byte;
 
@@ -47,7 +51,7 @@ end;
 function LoadIni: Byte;
 var
   ini: TMemInifile;
-  iniFileName: AnsiString;
+  iniFileName: string;
 begin
   iniFileName := EmptyStr;
   
@@ -62,43 +66,78 @@ begin
       ini := TMemIniFile.Create(iniFileName);
       if ini.SectionExists(C_INI_SECTION) then
       begin
-        if ini.ValueExists(C_INI_SECTION, 'TestProject') then
+        FUseBuildXML := False;
+        if ini.ValueExists(C_INI_SECTION, 'UseBuildXML') then
+          FUseBuildXML := ini.ReadBool(C_INI_SECTION, 'UseBuildXML', False);
+
+        if FUseBuildXML then
         begin
-          FTestProject := ini.ReadString(C_INI_SECTION, 'TestProject', EmptyStr);
-          if FileExists(FTestProject) then
+          FBuildXMLFilePath := '';
+          if ini.ValueExists(C_INI_SECTION, 'BuildXMLPath') then
+            FBuildXMLFilePath := ini.ReadString(C_INI_SECTION, 'BuildXMLPath', '');
+
+          if FileExists(FBuildXMLFilePath) then
+            Result := 0
+          else
           begin
-            if ini.ValueExists(C_INI_SECTION, 'DirectoryToWatch') then
+            Result := 10;
+            FUseBuildXML := False;
+          end;
+        end;
+
+        if not FUseBuildXML then
+        begin
+          if ini.ValueExists(C_INI_SECTION, 'TestProject') then
+          begin
+            FTestProject := ini.ReadString(C_INI_SECTION, 'TestProject', EmptyStr);
+            if FileExists(FTestProject) then
             begin
-              FDirectoryToWatch := ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr);
-              if DirectoryExists(FDirectoryToWatch) then
+              if ini.ValueExists(C_INI_SECTION, 'DirectoryToWatch') then
               begin
-                if ini.ValueExists(C_INI_SECTION, 'DCC32Exe') then
+                FDirectoryToWatch := ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr);
+                if DirectoryExists(FDirectoryToWatch) then
                 begin
-                  FDCC32ExePath := ini.ReadString(C_INI_SECTION, 'DCC32Exe', EmptyStr);
-                  if FileExists(FDCC32ExePath) then
+                  if ini.ValueExists(C_INI_SECTION, 'DCC32Exe') then
                   begin
-                    if (LowerCase(ExtractFileName(FDCC32ExePath)) = 'dcc32.exe') then
-                      Result := 0
+                    FDCC32ExePath := ini.ReadString(C_INI_SECTION, 'DCC32Exe', EmptyStr);
+                    if FileExists(FDCC32ExePath) then
+                    begin
+                      if (LowerCase(ExtractFileName(FDCC32ExePath)) = 'dcc32.exe') then
+                        Result := 0
+                      else
+                        Result := 9;
+                    end
                     else
-                      Result := 9;
+                      Result := 8;
                   end
                   else
-                    Result := 8;
+                    Result := 7;
                 end
                 else
-                  Result := 7;                
+                  Result := 6;
               end
               else
-                Result := 6;
+                Result := 5;
             end
             else
-              Result := 5;
+              Result := 4;
           end
           else
-            Result := 4;
+            Result := 3;
         end
         else
-          Result := 3;
+        begin
+          if ini.ValueExists(C_INI_SECTION, 'DirectoryToWatch') then
+          begin
+            FDirectoryToWatch := ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr);
+            if DirectoryExists(FDirectoryToWatch) then
+              Result := 0
+            else
+              Result := 6;
+          end
+          else
+            Result := 5;
+        end;
       end
       else
         Result := 2;
@@ -110,7 +149,21 @@ begin
     Result := 1;
 end;
 
+var
+  growl: TGrowlNotification;
+
 begin
+  try
+    growl := TGrowlNotification.Create;
+    try
+      growl.RegisterApplication;
+    finally
+      FreeAndNil(growl);
+    end;
+  except
+
+  end;
+
   LoadResult := LoadIni;
 
   case LoadResult of
@@ -123,11 +176,17 @@ begin
     7: Writeln('Error parsing autotest.ini: no DCC32Exe in Section [autotest]!');
     8: Writeln(Format('DCC32.exe "%s" not found!', [FDCC32ExePath]));
     9: Writeln(Format('"%s" is not a dcc32.exe!', [FDCC32ExePath]));
+   10: Writeln(Format('Could not find build.xml (%s)!', [FBuildXMLFilePath]));
   else
     SetConsoleCtrlHandler(@console_handler, true);
     FTerminate := false;
 
-    FAutoTestThread := TAutoTestThread.Create(FDirectoryToWatch, FTestProject, FDCC32ExePath);
+    FAutoTestThread := TAutoTestThread.Create;
+    FAutoTestThread.DirectoryToWatch := FDirectoryToWatch;
+    FAutoTestThread.TestProject := FTestProject;
+    FAutoTestThread.DCC32ExePath := FDCC32ExePath;
+    FAutoTestThread.UseBuildXML := FUseBuildXML;
+    FAutoTestThread.BuildXMLFilePath := FBuildXMLFilePath;
     FAutoTestThread.Resume;
 
     while not FTerminate do
