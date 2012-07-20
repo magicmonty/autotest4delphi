@@ -41,10 +41,10 @@ It must consist of a section [autotest] and has three entries:
 
 for example:
 
-    [section]
+    [autotest]
     TestProject=C:\Projects\MyAwesomeProject\Tests\MyAwesomeProjectTests.dpr
     DirectoryToWatch=C:\Projects\MyAwesomeProject
-    DirectoryToWatch=C:\Program Files (x86)\Borland\BDS\4.0\bin\dcc32.exe
+    DCC32Exe=C:\Program Files (x86)\Borland\BDS\4.0\bin\dcc32.exe
 
 
 Command line parameters
