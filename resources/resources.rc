@@ -1,3 +1,3 @@
-icon PNG "icon.png"
-error_icon PNG "error_icon.png"
-success_icon PNG "success_icon.png"
+icon RCDATA icon.png
+error_icon RCDATA error_icon.png
+success_icon RCDATA success_icon.png

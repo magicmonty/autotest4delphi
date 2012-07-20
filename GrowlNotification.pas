@@ -3,6 +3,7 @@ unit GrowlNotification;
 interface
 
 uses
+  SysUtils,
   Classes;
 
 type
@@ -10,10 +11,11 @@ type
 
   TGrowlNotification = class
   private
-    procedure SendCommand(Command: TStringStream);
+    procedure SendCommand(Command: TBytesStream; const Wait: Boolean = False);
     function LoadPNGResource(Id: string; const Stream: TStream): string;
-    procedure AddBinaryResource(Source: TMemoryStream; ID: string; Command: TStringStream);
-    procedure AddStringToCommand(Line: string; const command: TStringStream);
+    procedure AddBinaryResource(Source: TMemoryStream; ID: string; Command: TBytesStream);
+    procedure AddStringToCommand(Line: string; const command: TBytesStream);
+    procedure AddEndOfRequest(command: TBytesStream);
   public
     procedure RegisterApplication;
     procedure SendNotification(Title, Text: string; NotificationType: TNotificationType);
@@ -21,16 +23,19 @@ type
 
   TSendCommand = class(TThread)
   private
-    FDataString: AnsiString;
+    FData: TBytes;
   public
-    constructor Create(DataString: AnsiString);
+    constructor Create(Data: TBytes);
     procedure Execute; override;
   end;
+
+const
+  RESOURCE_BASE_URL = 'https://github.com/magicmonty/autotest4delphi/raw/master/resources/';
 implementation
 
 uses
   Windows,
-  SysUtils,
+  pngImage,
   DecHash,
   DecFmt,
   IdTcpClient,
@@ -38,14 +43,15 @@ uses
 
 procedure TGrowlNotification.RegisterApplication;
 var
-  command: TStringStream;
+  command: TBytesStream;
   icon, errorIcon, successIcon: TMemoryStream;
   iconId, errorIconId, successIconId: string;
 begin
   icon := TMemoryStream.Create;
   errorIcon := TMemoryStream.Create;
   successIcon := TMemoryStream.Create;
-  command := TStringStream.Create('');
+  command := TBytesStream.Create;
+  command.Size := 0;
   try
     iconId := LoadPNGResource('icon', icon);
     errorIconId := LoadPNGResource('error_icon', errorIcon);
@@ -53,38 +59,44 @@ begin
 
     AddStringToCommand('GNTP/1.0 REGISTER NONE', command);
     AddStringToCommand('Application-Name: Autotest4Delphi', command);
-    if iconId <> EmptyStr then
+    if iconId <> '' then
       AddStringToCommand('Application-Icon: x-growl-resource://' + iconId, command)
     else
-      AddStringToCommand('Application-Icon: ', command);
+      AddStringToCommand('Application-Icon: ' + RESOURCE_BASE_URL + 'icon.png', command);
+
     AddStringToCommand('Notifications-Count: 3', command);
     AddStringToCommand('', command);
     AddStringToCommand('Notification-Name: success', command);
     AddStringToCommand('Notification-Display-Name: Success', command);
     AddStringToCommand('Notification-Enabled: True', command);
-    if successIconId <> EmptyStr then
-      AddStringToCommand('Notification-Icon: x-growl-resource://' + successIconId, command);
+    if successIconId <> '' then
+      AddStringToCommand('Notification-Icon: x-growl-resource://' + successIconId, command)
+    else
+      AddStringToCommand('Notification-Icon: ' + RESOURCE_BASE_URL + 'success_icon.png', command);
     AddStringToCommand('', command);
     AddStringToCommand('Notification-Name: error', command);
     AddStringToCommand('Notification-Display-Name: Error', command);
     AddStringToCommand('Notification-Enabled: True', command);
-    if ErrorIconId <> EmptyStr then
-      AddStringToCommand('Notification-Icon: x-growl-resource://' + errorIconId, command);
+    if ErrorIconId <> '' then
+      AddStringToCommand('Notification-Icon: x-growl-resource://' + errorIconId, command)
+    else
+      AddStringToCommand('Notification-Icon: ' + RESOURCE_BASE_URL + 'error_icon.png', command);
     AddStringToCommand('', command);
     AddStringToCommand('Notification-Name: failure', command);
     AddStringToCommand('Notification-Display-Name: Failure', command);
     AddStringToCommand('Notification-Enabled: True', command);
-    if ErrorIconId <> EmptyStr then
-      AddStringToCommand('Notification-Icon: x-growl-resource://' + errorIconId, command);
+    if ErrorIconId <> '' then
+      AddStringToCommand('Notification-Icon: x-growl-resource://' + errorIconId, command)
+    else
+      AddStringToCommand('Notification-Icon: ' + RESOURCE_BASE_URL + 'error_icon.png', command);
 
     AddBinaryResource(icon, iconId, command);
     AddBinaryResource(successIcon, successIconId, command);
     AddBinaryResource(errorIcon, errorIconId, command);
 
-    AddStringToCommand('', command);
-    AddStringToCommand('', command);
+    AddEndOfRequest(command);
 
-    SendCommand(command);
+    SendCommand(command, true);
   finally
     FreeAndNil(command);
     FreeAndNil(icon);
@@ -93,29 +105,50 @@ begin
   end;
 end;
 
-procedure TGrowlNotification.SendCommand(Command: TStringStream);
+procedure TGrowlNotification.SendCommand(Command: TBytesStream; const Wait: Boolean = False);
+var
+  cmd: TSendCommand;
 begin
-  TSendCommand.Create(command.DataString);
+  if Wait then
+  begin
+    cmd := TSendCommand.Create(Command.Bytes);
+    cmd.WaitFor;
+  end
+  else
+    TSendCommand.Create(command.Bytes);
+
 end;
 
 procedure TGrowlNotification.SendNotification(Title, Text: string; NotificationType: TNotificationType);
 var
-  command: TStringStream;
+  command: TBytesStream;
 begin
-  command := TStringStream.Create('');
+  command := TBytesStream.Create();
   try
     AddStringToCommand('GNTP/1.0 NOTIFY NONE', command);
     AddStringToCommand('Application-Name: Autotest4Delphi', command);
     case NotificationType of
-      ntError: AddStringToCommand('Notification-Name: error', command);
-      ntFailure: AddStringToCommand('Notification-Name: failure', command);
-      ntSuccess: AddStringToCommand('Notification-Name: success', command);
+      ntError:
+        begin
+          AddStringToCommand('Notification-Name: error', command);
+          AddStringToCommand('Notification-Priority: 2', command);
+        end;
+      ntFailure:
+        begin
+          AddStringToCommand('Notification-Name: failure', command);
+          AddStringToCommand('Notification-Priority: 1', command);
+        end;
+      ntSuccess:
+        begin
+          AddStringToCommand('Notification-Name: success', command);
+          AddStringToCommand('Notification-Priority: -1', command);
+        end;
     end;
     AddStringToCommand('Notification-ID: ' + IntToStr(GetTickCount), command);
     AddStringToCommand('Notification-Title: ' + Title, command);
     AddStringToCommand('Notification-Text: ' + Text, command);
-    AddStringToCommand('', command);
-    AddStringToCommand('', command);
+
+    AddEndOfRequest(command);
 
     SendCommand(command);
   finally
@@ -123,55 +156,74 @@ begin
   end;
 end;
 
-procedure TGrowlNotification.AddBinaryResource(Source: TMemoryStream; ID: string; Command: TStringStream);
+procedure TGrowlNotification.AddEndOfRequest(command: TBytesStream);
 begin
-  if ID <> EmptyStr then
+  AddStringToCommand('', command);
+  AddStringToCommand('', command);
+end;
+
+procedure TGrowlNotification.AddBinaryResource(Source: TMemoryStream; ID: string; Command: TBytesStream);
+var
+  streamSize: Int64;
+begin
+  if (ID <> '') and (Source.Size > 0) then
   begin
     AddStringToCommand('', Command);
     AddStringToCommand('Identifier: ' + ID, Command);
     AddStringToCommand('Length: ' + IntToStr(Source.Size), Command);
     AddStringToCommand('', Command);
-    command.CopyFrom(Source, 0);
+    streamSize := Command.Size;
+    Command.CopyFrom(Source, 0);
+    Command.Size := streamSize + Source.Size;
     AddStringToCommand('', Command);
   end;
 end;
 
-procedure TGrowlNotification.AddStringToCommand(Line: string; const command: TStringStream);
+procedure TGrowlNotification.AddStringToCommand(Line: string; const command: TBytesStream);
+var
+  tmp: PAnsiChar;
+  bufferSize: Cardinal;
+  streamSize: Int64;
+  bytesWritten: Int64;
 begin
-  command.WriteString(Line + CRLF);
+  bufferSize := Length(AnsiString(Line) + #13#10);
+  tmp := PAnsiChar(AnsiString(Line + #13#10));
+  streamSize := command.Size;
+  bytesWritten := command.Write(tmp^, bufferSize);
+  command.Size := streamSize + bytesWritten;
 end;
 
 function TGrowlNotification.LoadPNGResource(Id: string; const Stream: TStream): string;
 var
-  tmpStream: TResourceStream;
+  png: TPngImage;
 begin
   Result := '';
 
   if not Assigned(Stream) then
     exit;
 
+  png := TPngImage.Create;
   try
-    tmpStream := TResourceStream.Create(HInstance, Id, 'PNG');
-    try
-      Stream.CopyFrom(tmpStream, tmpStream.Size);
-      Stream.Seek(0, soFromBeginning);
-      if Stream.Size > 0 then
-        Result := THash_MD5.CalcStream(Stream, Stream.Size, TFormat_HEXL);
-    finally
-      FreeAndNil(tmpStream);
-    end;
-  except
-    Result := '';
+    png.LoadFromResourceName(HInstance, Id);
+    Stream.Size := 0;
+    png.SaveToStream(Stream);
+
+    Stream.Seek(0, soFromBeginning);
+    if Stream.Size > 0 then
+      Result := string(THash_MD5.CalcStream(Stream, Stream.Size, TFormat_HEXL));
+    Stream.Seek(0, soFromBeginning);
+  finally
+    png.Free;
   end;
 end;
 
 { TSendCommand }
 
-constructor TSendCommand.Create(DataString: AnsiString);
+constructor TSendCommand.Create(Data: TBytes);
 begin
   inherited Create(true);
   FreeOnTerminate := true;
-  FDataString := DataString;
+  FData := Data;
   Resume;
 end;
 
@@ -183,10 +235,10 @@ begin
   try
     client.Host := '127.0.0.1';
     client.Port := 23053;
-    client.ConnectTimeout := 10;
+    client.ConnectTimeout := 100;
     client.Connect;
     if client.Connected then
-      client.SendCmd(FDataString);
+      client.Socket.Write(FData);
   finally
     try
       client.Disconnect;
