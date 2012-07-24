@@ -7,7 +7,7 @@ uses
   Classes;
 
 type
-  TNotificationType = (ntError, ntFailure, ntSuccess);
+  TNotificationType = (ntError, ntFailure, ntSuccess, ntNotify);
 
   TGrowlNotification = class
   private
@@ -64,7 +64,7 @@ begin
     else
       AddStringToCommand('Application-Icon: ' + RESOURCE_BASE_URL + 'icon.png', command);
 
-    AddStringToCommand('Notifications-Count: 3', command);
+    AddStringToCommand('Notifications-Count: 4', command);
     AddStringToCommand('', command);
     AddStringToCommand('Notification-Name: success', command);
     AddStringToCommand('Notification-Display-Name: Success', command);
@@ -89,6 +89,14 @@ begin
       AddStringToCommand('Notification-Icon: x-growl-resource://' + errorIconId, command)
     else
       AddStringToCommand('Notification-Icon: ' + RESOURCE_BASE_URL + 'error_icon.png', command);
+    AddStringToCommand('', command);
+    AddStringToCommand('Notification-Name: notify', command);
+    AddStringToCommand('Notification-Display-Name: Notify', command);
+    AddStringToCommand('Notification-Enabled: True', command);
+    if ErrorIconId <> '' then
+      AddStringToCommand('Notification-Icon: x-growl-resource://' + iconId, command)
+    else
+      AddStringToCommand('Notification-Icon: ' + RESOURCE_BASE_URL + 'icon.png', command);
 
     AddBinaryResource(icon, iconId, command);
     AddBinaryResource(successIcon, successIconId, command);
@@ -142,6 +150,11 @@ begin
         begin
           AddStringToCommand('Notification-Name: success', command);
           AddStringToCommand('Notification-Priority: -1', command);
+        end;
+      ntNotify:
+        begin
+          AddStringToCommand('Notification-Name: notify', command);
+          AddStringToCommand('Notification-Priority: 0', command);
         end;
     end;
     AddStringToCommand('Notification-ID: ' + IntToStr(GetTickCount), command);

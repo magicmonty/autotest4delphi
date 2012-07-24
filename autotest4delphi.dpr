@@ -149,20 +149,44 @@ begin
     Result := 1;
 end;
 
+procedure GrowlNotify(const AMessage: string);
 var
   growl: TGrowlNotification;
-
 begin
   try
     growl := TGrowlNotification.Create;
     try
-      growl.RegisterApplication;
+      growl.SendNotification('Autotest4Delphi', AMessage, ntNotify);
     finally
       FreeAndNil(growl);
     end;
   except
-
   end;
+end;
+
+var
+  registered: Boolean;
+  growl: TGrowlNotification;
+
+begin
+  registered := False;
+  try
+    growl := TGrowlNotification.Create;
+    try
+      try
+        growl.RegisterApplication;
+        registered := True;
+      except
+        registered := True;
+      end;
+    finally
+      FreeAndNil(growl);
+    end;
+  except
+  end;
+
+  if registered then
+    GrowlNotify('Autotest4Delphi running');
 
   LoadResult := LoadIni;
 
@@ -192,4 +216,7 @@ begin
     while not FTerminate do
       CheckSynchronize(10);
   end;
+
+  GrowlNotify('Autotest4Delphi closing');
+  Sleep(1000);
 end.
