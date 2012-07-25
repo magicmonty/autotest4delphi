@@ -10,7 +10,7 @@
   </environment>
   <build>
     <command>msbuild.exe</command>
-    <params>/nologo /verbosity:quiet /p:config=ExampleTestProject.dproj</params>
+    <params>/nologo /verbosity:quiet /p:config=Release</params>
   </build>
   <test>
     <command>%CD%\bin\ExampleTestProject.exe</command>

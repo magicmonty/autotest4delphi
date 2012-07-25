@@ -12,3 +12,5 @@ dcu/*.dcu
 /resources.res
 /ExeIcon.res
 /VersionInfo.res
+/examples/bin/dunit-report.xml
+/examples/dunit-report.xml
