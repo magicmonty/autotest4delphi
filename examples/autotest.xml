@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<buildrunner>
+  <environment>
+    <BDS>C:\Program Files (x86)\CodeGear\RAD Studio\6.0</BDS>
+    <BDSCOMMONDIR />
+    <FrameworkDir>%WINDIR%\Microsoft.NET\Framework64\</FrameworkDir>
+    <FrameworkVersion>v2.0.50727</FrameworkVersion>
+    <FrameworkSDKDir></FrameworkSDKDir>
+    <Path>%FrameworkDir%%FrameworkVersion%;%FrameworkSDKDir%;%Path%</Path>
+  </environment>
+  <build>
+    <command>msbuild.exe</command>
+    <params>/nologo /verbosity:quiet /p:config=ExampleTestProject.dproj</params>
+  </build>
+  <test>
+    <command>%CD%\bin\ExampleTestProject.exe</command>
+    <params></params>
+  </test>
+</buildrunner>

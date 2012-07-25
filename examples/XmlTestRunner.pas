@@ -25,11 +25,10 @@
  * Jeff Moore <JeffMoore@users.sourceforge.net>
  * Kris Golko <neuromancer@users.sourceforge.net>
  * The DUnit group at SourceForge <http://dunit.sourceforge.net>
- *
  *)
 
 {
- Contributor : Laurent Laffont <llaffont@altaiire.fr> 
+ Contributor : Martin Gondermann <magicmonty@pagansoft.de>
 }
 
 unit XMLTestRunner;
@@ -46,256 +45,123 @@ const
 type
   TXMLTestListener = class(TInterfacedObject, ITestListener, ITestListenerX)
   private
-     FOutputFile : TextFile;
-     FFileName : String;
-     
-  protected
-     startTime : Integer;
-     dtStartTime : TDateTime;
+    FOutputFile: TextFile;
+    FOutputFileName: string;
+    FFileOpen: Boolean;
+    FStartTime: Cardinal;
+    FDtStartTime: TDateTime;
+    FSuiteStack: TStringList;
 
-     testStart : TDateTime;
-     FSuiteStack : TStringList;
-     
-     procedure writeReport(str: String);
+    class var FConsoleOutput: string;
+    class var FFailureOutput: string;
+    class var FErrorOutput: string;
 
-     function GetCurrentSuiteName : string;
+    procedure WriteReport(const AValue: string);
+    function GetCurrentSuiteName: string;
+
+    function Text2Sgml(const AText: string): string;
   public
     // implement the ITestListener interface
-    procedure AddSuccess(test: ITest); virtual;
-    procedure AddError(error: TTestFailure); virtual;
-    procedure AddFailure(failure: TTestFailure); virtual;
-    function  ShouldRunTest(test :ITest):boolean; virtual;
-    procedure StartSuite(suite: ITest); virtual;
-    procedure EndSuite(suite: ITest); virtual;
-    procedure StartTest(test: ITest); virtual;
-    procedure EndTest(test: ITest); virtual;
+    procedure AddSuccess(ATest: ITest); virtual;
+    procedure AddError(AError: TTestFailure); virtual;
+    procedure AddFailure(AFailure: TTestFailure); virtual;
+    function  ShouldRunTest(ATest: ITest):boolean; virtual;
+    procedure StartSuite(ASuite: ITest); virtual;
+    procedure EndSuite(ASuite: ITest); virtual;
+    procedure StartTest(ATest: ITest); virtual;
+    procedure EndTest(ATest: ITest); virtual;
     procedure TestingStarts; virtual;
-    procedure TestingEnds(testResult: TTestResult); virtual;
-    procedure Status(test :ITest; const Msg :string);
-    procedure Warning(test :ITest; const Msg :string);
+    procedure TestingEnds(ATestResult: TTestResult); virtual;
+    procedure Status(ATest: ITest; const Msg: string);
+    procedure Warning(ATest: ITest; const Msg: string);
 
     constructor Create; overload;
-    constructor Create(outputFile : String); overload;
+    constructor Create(const AOutputFile: string); overload;
     destructor Destroy; override;
-    
-    class function RunTest(suite: ITest; outputFile:String): TTestResult; overload;
-    class function RunRegisteredTests(outputFile:String): TTestResult;
-    class function text2sgml(text : String) : String;
-    class function StringReplaceAll (text,byt,mot : string ) :string;
-    
-    //:Report filename. If an empty string, then standard output is used (compile with -CC option)
-    property FileName : String read FFileName write FFileName;
+
+    class function RunTest(const ASuite: ITest; const AOutputFile: string): TTestResult; overload;
+    class function RunRegisteredTests(const AOutputFile: string): TTestResult;
+
+    property OutputFileName: string read FOutputFileName write FOutputFileName;
   end;
 
-{: Run the given test suite
-}
-function RunTest(suite: ITest; outputFile:String=DEFAULT_FILENAME) : TTestResult; overload;
-function RunRegisteredTests(outputFile:String=DEFAULT_FILENAME) : TTestResult; overload;
+// Run the given test suite
+function RunTest(const ASuite: ITest): TTestResult; overload;
+function RunRegisteredTests: TTestResult; overload;
+function TestsWereSuccessful: Boolean;
+procedure RunTestsAndClose;
 
 implementation
 
 uses Forms, Windows;
 
 const
-   CRLF = #13#10;
-   MAX_DEEP = 5;
+  CRLF = #13#10;
+  MAX_DEEP = 5;
+  TrueFalse : array[Boolean] of string = ('False', 'True');
 
-{ TXMLTestListener }
-   
+
+function OutputFile: string;
+begin
+  if (ParamCount = 2) and DirectoryExists(ExtractFilePath(ParamStr(2))) then
+    Result := ParamStr(2)
+  else
+    Result := DEFAULT_FILENAME;
+end;
+
+function TestsWereSuccessful: Boolean;
+begin
+  Result := RunRegisteredTests.WasSuccessful;
+end;
+
+function RunRegisteredTests: TTestResult;
+begin
+  Result := TXMLTestListener.RunRegisteredTests(OutputFile);
+end;
+
+function RunTest(const ASuite: ITest): TTestResult;
+begin
+   Result := TXMLTestListener.RunTest(ASuite, OutputFile);
+end;
+
+procedure RunTestsAndClose;
+begin
+  try
+    if not TestsWereSuccessful then
+      Halt(1);
+  except
+    on E: Exception do
+      Writeln(Format('%s: %s', [E.ClassName, E.Message]));
+  end;
+end;
+
+{$region 'TXMLTestListener'}
+class function TXMLTestListener.RunTest(
+  const ASuite: ITest; const AOutputFile: string): TTestResult;
+begin
+   Result := TestFramework.RunTest(ASuite, [TXMLTestListener.Create(AOutputFile)]);
+end;
+
+class function TXMLTestListener.RunRegisteredTests(
+  const AOutputFile: string): TTestResult;
+begin
+  Result := TXMLTestListener.RunTest(registeredTests, AOutputFile);
+end;
+
 constructor TXMLTestListener.Create;
 begin
    Create(DEFAULT_FILENAME);
 end;
 
-constructor TXMLTestListener.Create(outputFile : String);
+constructor TXMLTestListener.Create(const AOutputFile: string);
 begin
-   inherited Create;
-   FileName := outputFile;
-   FSuiteStack := TStringList.Create;
-end;
-
-{:
- Write F in the report file or on standard output if none specified
-}
-procedure TXMLTestListener.writeReport(str : String);
-begin
-   if TTextRec(FOutputFile).Mode = fmOutput then
-      writeln(FOutputFile, str)
-   else
-      writeln(str);
-end;
-
-const
-  TrueFalse : array[Boolean] of string = ('False', 'True');
-
-procedure TXMLTestListener.AddSuccess(test: ITest);
-begin
-   if test.tests.Count<=0 then
-   begin
-      writeReport(Format('<test-case name="%s%s" executed="%s" success="True" time="%1.3f" result="Pass"/>',
-                         [GetCurrentSuiteName, test.GetName, TrueFalse[test.Enabled], test.ElapsedTestTime / 1000]));
-   end;
-end;
-
-procedure TXMLTestListener.AddError(error: TTestFailure);
-begin
-   writeReport(Format('<test-case name="%s%s" execute="%s" success="False" time="%1.3f" result="Error">',
-                      [GetCurrentSuiteName, error.FailedTest.GetName, TrueFalse[error.FailedTest.Enabled], error.FailedTest.ElapsedTestTime / 1000]));
-   writeReport(Format('<failure name="%s" location="%s"/>', [error.ThrownExceptionName, error.LocationInfo]));
-   writeReport('<message>' + text2sgml(error.ThrownExceptionMessage) + '</message>');
-   writeReport('</test-case>');
-end;
-
-procedure TXMLTestListener.AddFailure(failure: TTestFailure);
-begin
-   writeReport(Format('<test-case name="%s%s" execute="%s" success="False" time="%1.3f" result="Failure">',
-                      [GetCurrentSuiteName, failure.FailedTest.GetName, TrueFalse[failure.FailedTest.Enabled], failure.FailedTest.ElapsedTestTime / 1000]));
-   writeReport(Format('<failure name="%s" location="%s"/>', [failure.ThrownExceptionName, failure.LocationInfo]));
-   writeReport('<message>' + text2sgml(failure.ThrownExceptionMessage) + '</message>');
-   writeReport('</test-case>');
-end;
-
-
-procedure TXMLTestListener.StartTest(test: ITest);
-begin
-end;
-
-procedure TXMLTestListener.EndTest(test: ITest);
-begin
-end;
-
-procedure TXMLTestListener.TestingStarts;
-begin
-   startTime := GetTickCount;
-   dtStartTime := Now;
-   
-   if FFileName<>'' then
-   begin
-     AssignFile(FOutputFile, FFileName);
-     Rewrite(FOutputFile);
-   end;
-   
-   writeReport('<?xml version="1.0" encoding="ISO-8859-1" standalone="yes" ?>');
-   writeReport(Format('<test-results total="%d" notrun="%d" date="%s" time="%s">',
-                      [RegisteredTests.CountTestCases,
-                        RegisteredTests.CountTestCases - RegisteredTests.CountEnabledTestCases,
-                          DateToStr(Now),
-                            TimeToStr(Now)]));
-end;
-
-procedure TXMLTestListener.TestingEnds(testResult: TTestResult);
-var
-   runTime : Double;
-   successRate : Integer;
-begin
-   runtime := (GetTickCount - startTime) / 1000;
-   if testResult.RunCount > 0 then
-     successRate :=  Trunc(
-        ((testResult.runCount - testResult.failureCount - testResult.errorCount)
-         /testResult.runCount)
-        *100)
-   else
-     successRate := 100;
-
-   writeReport('<statistics>'+CRLF+
-                  '<stat name="tests" value="'+intToStr(testResult.runCount)+'" />'+CRLF+
-                  '<stat name="failures" value="'+intToStr(testResult.failureCount)+'" />'+CRLF+
-                  '<stat name="errors" value="'+intToStr(testResult.errorCount)+'" />'+CRLF+
-                  '<stat name="success-rate" value="'+intToStr(successRate)+'%" />'+CRLF+
-                  '<stat name="started-at" value="'+DateTimeToStr(dtStartTime)+'" />'+CRLF+
-                  '<stat name="finished-at" value="'+DateTimeToStr(now)+'" />'+CRLF+
-                  Format('<stat name="runtime" value="%1.3f"/>', [runtime])+CRLF+
-                  '</statistics>'+CRLF+
-              '</test-results>');
-   
-   if TTextRec(FOutputFile).Mode = fmOutput then
-      Close(FOutputFile);
-end;
-
-class function TXMLTestListener.RunTest(suite: ITest; outputFile:String): TTestResult;
-begin
-   Result := TestFramework.RunTest(suite, [TXMLTestListener.Create(outputFile)]);
-end;
-
-class function TXMLTestListener.RunRegisteredTests(outputFile:String): TTestResult;
-begin
-  Result := RunTest(registeredTests, outputFile);
-end;
-
-function RunTest(suite: ITest; outputFile:String=DEFAULT_FILENAME): TTestResult;
-begin
-   Result := TestFramework.RunTest(suite, [TXMLTestListener.Create(outputFile)]);
-end;
-
-function RunRegisteredTests(outputFile:String=DEFAULT_FILENAME): TTestResult;
-begin
-   Result := RunTest(registeredTests, outputFile);
-end;
-
-
-procedure TXMLTestListener.Status(test: ITest; const Msg: string);
-begin
-  writeReport(Format('INFO: %s: %s', [test.Name, Msg]));
-end;
-
-procedure TXMLTestListener.Warning(test :ITest; const Msg :string);
-begin
-  writeReport(Format('WARNING: %s: %s', [test.Name, Msg]));
-end;
-
-function TXMLTestListener.ShouldRunTest(test: ITest): boolean;
-begin
-  Result := test.Enabled;
-  if not Result then
-    writeReport(Format('<test-case name="%s%s" executed="False"/>',
-                       [GetCurrentSuiteName, test.GetName]));
-end;
-
-procedure TXMLTestListener.EndSuite(suite: ITest);
-begin
-     if CompareText(suite.Name, ExtractFileName(Application.ExeName)) = 0 then
-       Exit;
-     writeReport('</results>');
-     writeReport('</test-suite>');
-     FSuiteStack.Delete(0);
-end;
-
-procedure TXMLTestListener.StartSuite(suite: ITest);
-var
-  s : string;
-begin
-   if CompareText(suite.Name, ExtractFileName(Application.ExeName)) = 0 then
-     Exit;
-   s := GetCurrentSuiteName + suite.Name;
-   writeReport(Format('<test-suite name="%s" total="%d" notrun="%d">', [s, suite.CountTestCases, suite.CountTestCases - suite.CountEnabledTestCases]));
-   FSuiteStack.Insert(0, suite.getName);
-   writeReport('<results>');
-end;
-
-{:
- Replace byt string by mot in text string
- }
-class function TXMLTestListener.StringReplaceAll (text,byt,mot : string ) :string;
-var
-   plats : integer;
-begin
-While pos(byt,text) > 0 do
-      begin
-      plats := pos(byt,text);
-      delete (text,plats,length(byt));
-      insert (mot,text,plats);
-      end;
-result := text;
-end;
-
-{:
- Replace special character by sgml compliant characters
- }
-class function TXMLTestListener.text2sgml(text : String) : String;
-begin
-  text := stringreplaceall (text,'<','&lt;');
-  text := stringreplaceall (text,'>','&gt;');
-  result := text;
+  inherited Create;
+  FOutputFileName := AOutputFile;
+  FSuiteStack := TStringList.Create;
+  FFileOpen := False;
+  FConsoleOutput := '';
+  FFailureOutput := '';
+  FErrorOutput := '';
 end;
 
 destructor TXMLTestListener.Destroy;
@@ -304,13 +170,277 @@ begin
   inherited Destroy;
 end;
 
+{Write F in the report file or on standard output if none specified}
+procedure TXMLTestListener.WriteReport(const AValue: string);
+begin
+  if FFileOpen then
+  begin
+    if TTextRec(FOutputFile).Mode = fmOutput then
+      writeln(FOutputFile, AValue)
+    else
+      writeln(AValue);
+  end;
+end;
+
+procedure TXMLTestListener.AddSuccess(ATest: ITest);
+begin
+  if ATest.Tests.Count<=0 then
+  begin
+    WriteReport(
+      Format(
+        '<test-case name="%s%s" executed="%s" success="True" time="%1.3f" result="Pass"/>',
+        [
+          GetCurrentSuiteName,
+          ATest.GetName,
+          TrueFalse[ATest.Enabled],
+          ATest.ElapsedTestTime / 1000
+        ]
+      )
+    );
+  end;
+end;
+
+procedure TXMLTestListener.AddError(AError: TTestFailure);
+var
+  tmp: string;
+begin
+  WriteReport(
+    Format(
+      '<test-case name="%s%s" execute="%s" success="False" time="%1.3f" result="Error">',
+      [
+        GetCurrentSuiteName,
+        AError.FailedTest.GetName,
+        TrueFalse[AError.FailedTest.Enabled],
+        AError.FailedTest.ElapsedTestTime / 1000
+      ]
+    )
+  );
+
+  WriteReport(
+    Format(
+      '<failure name="%s" location="%s"/>',
+      [AError.ThrownExceptionName, AError.LocationInfo]
+    )
+  );
+
+  WriteReport('<message>' + Text2Sgml(AError.ThrownExceptionMessage) + '</message>');
+  WriteReport('</test-case>');
+
+  tmp := GetCurrentSuiteName + AError.FailedTest.Name;
+  if Trim(AError.LocationInfo) <> EmptyStr then
+    tmp := tmp + ' (' + AError.LocationInfo + ')';
+  tmp := tmp + ':' + CRLF + #9 + AError.ThrownExceptionMessage + CRLF;
+
+  FErrorOutput := FErrorOutput + CRLF + tmp;
+end;
+
+procedure TXMLTestListener.AddFailure(AFailure: TTestFailure);
+var
+  tmp: string;
+begin
+  WriteReport(
+    Format(
+      '<test-case name="%s%s" execute="%s" success="False" time="%1.3f" result="Failure">',
+      [
+        GetCurrentSuiteName,
+        AFailure.FailedTest.GetName,
+        TrueFalse[AFailure.FailedTest.Enabled],
+        AFailure.FailedTest.ElapsedTestTime / 1000
+      ]
+    )
+  );
+  WriteReport(
+    Format(
+      '<failure name="%s" location="%s"/>',
+      [AFailure.ThrownExceptionName, AFailure.LocationInfo]
+    )
+  );
+  WriteReport('<message>' + Text2Sgml(AFailure.ThrownExceptionMessage) + '</message>');
+  WriteReport('</test-case>');
+
+  tmp := GetCurrentSuiteName + AFailure.FailedTest.Name;
+  if Trim(AFailure.LocationInfo) <> EmptyStr then
+    tmp := tmp + ' (' + AFailure.LocationInfo + ')';
+  tmp := tmp + ': ' + CRLF + #9 + AFailure.ThrownExceptionMessage + CRLF;
+
+  FFailureOutput := FFailureOutput + tmp + CRLF;
+end;
+
+procedure TXMLTestListener.StartTest(ATest: ITest);
+begin
+end;
+
+procedure TXMLTestListener.EndTest(ATest: ITest);
+begin
+end;
+
+procedure TXMLTestListener.TestingStarts;
+begin
+  FStartTime := GetTickCount;
+  FDtStartTime := Now;
+  FConsoleOutput := '';
+  FErrorOutput := '';
+  FFailureOutput := '';
+
+  try
+    if FOutputFileName<>'' then
+    begin
+      AssignFile(FOutputFile, FOutputFileName);
+      Rewrite(FOutputFile);
+    end;
+  except
+    on E:EInOutError do
+     FFileOpen := False;
+  end;
+
+  WriteReport('<?xml version="1.0" encoding="ISO-8859-1" standalone="yes" ?>');
+  WriteReport(
+    Format(
+      '<test-results total="%d" notrun="%d" date="%s" time="%s">',
+      [
+        RegisteredTests.CountTestCases,
+        RegisteredTests.CountTestCases - RegisteredTests.CountEnabledTestCases,
+        DateToStr(Now),
+        TimeToStr(Now)
+      ]
+    )
+  );
+end;
+
+procedure TXMLTestListener.TestingEnds(ATestResult: TTestResult);
+var
+  RunTime : Double;
+  SuccessRate : Integer;
+  RunCount, ErrorCount, FailureCount: Integer;
+begin
+  RunTime := (GetTickCount - FStartTime) / 1000;
+
+  try
+    RunCount := ATestResult.RunCount;
+  except
+    RunCount := 0;
+  end;
+
+  try
+    if not ATestResult.WasSuccessful then
+      FailureCount := ATestResult.FailureCount
+    else
+      FailureCount := 0;
+  except
+    FailureCount := 0;
+  end;
+
+  try
+    if not ATestResult.WasSuccessful then
+      ErrorCount := ATestResult.ErrorCount
+    else
+      ErrorCount := 0;
+  except
+    ErrorCount := 0;
+  end;
+
+  if RunCount > 0 then
+    SuccessRate :=  Trunc(((RunCount - FailureCount - ErrorCount) / RunCount) *100)
+  else
+    SuccessRate := 100;
+
+  WriteReport('<statistics>' + CRLF +
+                '<stat name="tests" value="' + IntToStr(RunCount) + '" />' + CRLF +
+                '<stat name="failures" value="' + IntToStr(FailureCount) + '" />' + CRLF +
+                '<stat name="errors" value="' + IntToStr(ErrorCount) + '" />' + CRLF +
+                '<stat name="success-rate" value="' + IntToStr(SuccessRate) + '%" />' + CRLF +
+                '<stat name="started-at" value="' + DateTimeToStr(FDtStartTime) + '" />' + CRLF +
+                '<stat name="finished-at" value="' + DateTimeToStr(now) + '" />' + CRLF +
+                Format('<stat name="runtime" value="%1.3f"/>', [RunTime]) + CRLF +
+              '</statistics>' + CRLF +
+              '</test-results>');
+
+  if FFileOpen and (TTextRec(FOutputFile).Mode = fmOutput) then
+    Close(FOutputFile);
+
+  FConsoleOutput := 'Run: ' + IntToStr(RunCount) +
+                    ' / Failures: ' + IntToStr(FailureCount) +
+                    ' / Errors: ' + IntToStr(ErrorCount);
+
+  if ErrorCount > 0 then
+    FConsoleOutput := FConsoleOutput + CRLF + 'Errors:' + CRLF + Trim(FErrorOutput);
+  if FailureCount > 0 then
+    FConsoleOutput := FConsoleOutput + CRLF + 'Failures:' + CRLF + Trim(FFailureOutput);
+
+  FConsoleOutput := Trim(FConsoleOutput);
+  Writeln(FConsoleOutput);
+end;
+
+procedure TXMLTestListener.Status(ATest: ITest; const Msg: string);
+begin
+  WriteReport(Format('INFO: %s: %s', [ATest.Name, Msg]));
+end;
+
+procedure TXMLTestListener.Warning(ATest: ITest; const Msg: string);
+begin
+  WriteReport(Format('WARNING: %s: %s', [ATest.Name, Msg]));
+end;
+
+function TXMLTestListener.ShouldRunTest(ATest: ITest): Boolean;
+begin
+  Result := ATest.Enabled;
+  if not Result then
+    WriteReport(
+      Format(
+        '<test-case name="%s%s" executed="False"/>',
+        [GetCurrentSuiteName, ATest.GetName]
+      )
+    );
+end;
+
+procedure TXMLTestListener.EndSuite(ASuite: ITest);
+begin
+  if CompareText(ASuite.Name, ExtractFileName(Application.ExeName)) = 0 then
+    Exit;
+
+  WriteReport('</results>');
+  WriteReport('</test-suite>');
+  FSuiteStack.Delete(0);
+end;
+
+procedure TXMLTestListener.StartSuite(ASuite: ITest);
+var
+  s: string;
+begin
+  if CompareText(ASuite.Name, ExtractFileName(Application.ExeName)) = 0 then
+    Exit;
+
+  s := GetCurrentSuiteName + ASuite.Name;
+  WriteReport(
+    Format(
+      '<test-suite name="%s" total="%d" notrun="%d">',
+      [
+        s,
+        ASuite.CountTestCases,
+        ASuite.CountTestCases - ASuite.CountEnabledTestCases
+      ]
+    )
+  );
+
+  FSuiteStack.Insert(0, ASuite.Name);
+  WriteReport('<results>');
+end;
+
 function TXMLTestListener.GetCurrentSuiteName: string;
 var
-  c : Integer;
+  StackIndex: Integer;
 begin
   Result := '';
-  for c := 0 to FSuiteStack.Count - 1 do
-    Result := FSuiteStack[c] + '.' + Result;
+
+  for StackIndex := 0 to FSuiteStack.Count - 1 do
+    Result := FSuiteStack[StackIndex] + '.' + Result;
 end;
+
+function TXMLTestListener.Text2Sgml(const AText: string): string;
+begin
+  Result := StringReplace(AText, '<', '&lt;', [rfReplaceAll]);
+  Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll]);
+end;
+{$endregion 'TXMLTestListener'}
 
 end.

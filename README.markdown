@@ -9,7 +9,7 @@ In Order to work with this tool, you need the following:
 
 * a test project
 * Growl for Windows (optional)
-* Delphi (BDS 2006 or higher)
+* Delphi (BDS 2009 or higher)
 * a file named `autotest.ini` in the same directory as the autotest4delphi.exe
 
 The Test-Project
@@ -19,9 +19,8 @@ The test project MUST return an non zero Error code if there is a failure.
 An example project lies in the examples directory.
 I usually replace the ConsoleTestRunner with a modified XMLTestRunner, which
 outputs a NUnit compatible XML. 
-I took the XMLTestRunner from [DelphiXtreme](http://http://delphixtreme.com/wordpress/?page_id=8)
-for this task.
-
+I took the XMLTestRunner from [DelphiXtreme](http://http://delphixtreme.com/wordpress/?page_id=8) for this task and modified it to 
+the needs.
 
 The Test procject will be compiled with 
 
