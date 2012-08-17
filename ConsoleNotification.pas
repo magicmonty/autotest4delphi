@@ -54,11 +54,11 @@ begin
       newAttributes := newAttributes and not FOREGROUND_INTENSITY;
 
     SetConsoleTextAttribute(outputHandle, newAttributes);
-    Writeln(outputHandle, Text);
+    Writeln(Text);
     if Trim(ConsoleOutput) <> EmptyStr then
     begin
-      Writeln(outputHandle);
-      Writeln(outputHandle, ConsoleOutput);
+      Writeln;
+      Writeln(ConsoleOutput);
     end;
 
     SetConsoleTextAttribute(outputHandle, originalAttributes);
