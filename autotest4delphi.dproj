@@ -62,10 +62,14 @@
 			<DCCReference Include="ActiveObjectEngine.pas"/>
 			<DCCReference Include="DirWatcher.pas"/>
 			<DCCReference Include="TestCommand.pas"/>
-			<DCCReference Include="GrowlNotification.pas"/>
+			<DCCReference Include="GrowlNotifier.pas"/>
 			<DCCReference Include="PrjConst.pas"/>
 			<DCCReference Include="AutoTestThread.pas"/>
 			<DCCReference Include="MSBuildCommand.pas"/>
+			<DCCReference Include="Notification.pas"/>
+			<DCCReference Include="GrowlNotification.pas"/>
+			<DCCReference Include="ConsoleNotification.pas"/>
+			<DCCReference Include="ComposedNotification.pas"/>
 			<BuildConfiguration Include="Basis">
 				<Key>Base</Key>
 			</BuildConfiguration>

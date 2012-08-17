@@ -5,17 +5,15 @@ interface
 uses
   Forms,
   StdCtrls,
+  Notification,
+  GrowlNotifier,
   Classes;
 
 type
   ICommand = interface
   ['{D2FCD7B7-7263-4F67-8783-048E5AB31AD0}']
+    procedure SetNotification(const ANotification: INotification);
     procedure Execute;
-  end;
-
-  TCommand = class(TInterfacedObject, ICommand)
-  public
-    procedure Execute; virtual; abstract;
   end;
 
   TActiveObjectEngine = class
@@ -24,59 +22,77 @@ type
     FStop: Boolean;
     FExecuting: Boolean;
     FRunning: Boolean;
+    FNotification: INotification;
   public
     property Stopped: Boolean read FStop write FStop;
 
     property Executing: Boolean read FExecuting;
     property Running: Boolean read FRunning;
 
-    constructor Create;
+    constructor Create(const ANotification: INotification);
     destructor Destroy; override;
 
-    procedure AddCommand(Command: ICommand);
+    procedure AddCommand(ACommand: ICommand);
     procedure Stop;
     procedure Run;
   end;
 
-  TSleepCommand = class(TInterfacedObject, ICommand)
-  private
-    FWakeupCommand: ICommand;
+  TCommand = class(TInterfacedObject, ICommand)
+  strict private
+    FNotification: INotification;
     FEngine: TActiveObjectEngine;
+  protected
+    property Engine: TActiveObjectEngine read FEngine;
+    procedure ShowNotification(
+      const ATitle: string;
+      const AText: string;
+      const AConsoleOutput: string;
+      const ANotificationType: TNotificationType); virtual;
+  public
+    constructor Create(const AEngine: TActiveObjectEngine);
+
+    procedure SetNotification(const ANotification: INotification); virtual;
+    procedure Execute; virtual; abstract;
+  end;
+
+  TSleepCommand = class(TCommand)
+  strict private
+    FWakeupCommand: ICommand;
     FSleepTime: Int64;
     FStartTime: Int64;
     FStarted: Boolean;
   public
-    constructor Create(Milliseconds: Longint; Engine: TActiveObjectEngine; WakeupCommand: ICommand);
-    procedure Execute;
+    constructor Create(
+      AEngine: TActiveObjectEngine;
+      ASleepTimeInMilliseconds: Longint;
+      AWakeupCommand: ICommand);
+    procedure Execute; override;
   end;
 
-  TStopCommand = class(TInterfacedObject, ICommand)
-  private
-    FEngine: TActiveObjectEngine;
+  TStopCommand = class(TCommand)
   public
-    constructor Create(Engine: TActiveObjectEngine);
-    procedure Execute;
+    procedure Execute; override;
   end;
 
-  TLoopCommand = class(TInterfacedObject, ICommand)
-  private
-    FEngine: TActiveObjectEngine;
+  TLoopCommand = class(TCommand)
   public
-    constructor Create(Engine: TActiveObjectEngine);
-    procedure Execute;
+    procedure Execute; override;
   end;
 
 implementation
 
 uses
+  Windows,
   DateUtils,
-  SysUtils;
+  SysUtils,
+  PrjConst;
 
-constructor TActiveObjectEngine.Create;
+constructor TActiveObjectEngine.Create(const ANotification: INotification);
 begin
   inherited Create;
   FStop := false;
   FCommands := TInterfaceList.Create;
+  FNotification := ANotification;
 end;
 
 destructor TActiveObjectEngine.Destroy;
@@ -85,11 +101,10 @@ begin
   inherited Destroy;
 end;
 
-procedure TActiveObjectEngine.AddCommand(Command: ICommand);
+procedure TActiveObjectEngine.AddCommand(ACommand: ICommand);
 begin
-  FCommands.Add(Command);
+  FCommands.Add(ACommand);
 end;
-
 
 procedure TActiveObjectEngine.Run;
 var
@@ -101,6 +116,7 @@ begin
   begin
     FRunning := true;
     command := FCommands.Items[0] as ICommand;
+    command.SetNotification(FNotification);
     FCommands.Delete(0);
     FExecuting := true;
     try
@@ -122,13 +138,16 @@ end;
 
 { TSleepCommand }
 
-constructor TSleepCommand.Create(Milliseconds: Integer; Engine: TActiveObjectEngine; WakeupCommand: ICommand);
+constructor TSleepCommand.Create(
+  AEngine: TActiveObjectEngine;
+  ASleepTimeInMilliseconds: Integer;
+  AWakeupCommand: ICommand);
 begin
-  FSleepTime := Milliseconds;
+  inherited Create(Engine);
+  FSleepTime := ASleepTimeInMilliseconds;
   FStarted := false;
   FStartTime := 0;
-  FEngine := Engine;
-  FWakeupCommand := WakeupCommand;
+  FWakeupCommand := AWakeupCommand;
 end;
 
 procedure TSleepCommand.Execute;
@@ -140,17 +159,17 @@ begin
   begin
     FStarted := true;
     FStartTime := currentTime;
-    FEngine.AddCommand(Self);
+    Engine.AddCommand(Self);
   end
   else
   begin
-    if not FEngine.Stopped then
+    if not Engine.Stopped then
     begin
       elapsedTime := currentTime - FStartTime;
       if (elapsedTime < FSleepTime) then
-        FEngine.AddCommand(Self)
+        Engine.AddCommand(Self)
       else
-        FEngine.AddCommand(FWakeupCommand);
+        Engine.AddCommand(FWakeupCommand);
     end;
   end;
   Sleep(1);
@@ -159,33 +178,50 @@ end;
 
 { TStopCommand }
 
-constructor TStopCommand.Create(Engine: TActiveObjectEngine);
-begin
-  inherited Create;
-  FEngine := Engine;
-end;
-
 procedure TStopCommand.Execute;
 begin
-  FEngine.Stopped := true;
+  Engine.Stopped := true;
 end;
 
 
 { TLoopCommand }
 
-constructor TLoopCommand.Create(Engine: TActiveObjectEngine);
-begin
-  inherited Create;
-  FEngine := Engine;
-end;
-
 procedure TLoopCommand.Execute;
 begin
-  if not FEngine.Stopped then
+  if not Engine.Stopped then
   begin
     Sleep(100);
-    FEngine.AddCommand(Self)
+    Engine.AddCommand(Self)
   end;
+end;
+
+{ TCommand }
+
+constructor TCommand.Create(const AEngine: TActiveObjectEngine);
+begin
+  inherited Create;
+  FEngine := AEngine;
+  FNotification := nil;
+end;
+
+procedure TCommand.SetNotification(const ANotification: INotification);
+begin
+  FNotification := ANotification;
+end;
+
+procedure TCommand.ShowNotification(
+  const ATitle: string;
+  const AText: string;
+  const AConsoleOutput: string;
+  const ANotificationType: TNotificationType);
+begin
+  if Assigned(FNotification) then
+    FNotification.ShowNotification(
+      ATitle,
+      AText,
+      AConsoleOutput,
+      ANotificationType
+    );
 end;
 
 end.

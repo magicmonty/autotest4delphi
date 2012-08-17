@@ -4,6 +4,7 @@ interface
 
 uses
   Classes,
+  Notification,
   ActiveObjectEngine,
   DirWatcher;
 
@@ -29,7 +30,7 @@ type
     property UseBuildXML: Boolean read FUseBuildXML write FUseBuildXML;
     property BuildXMLFilePath: string read FBuildXMLFilePath write FBuildXMLFilePath;
 
-    constructor Create;
+    constructor Create(const ANotification: INotification);
     destructor Destroy; override;
     procedure Execute; override;
   end;
@@ -41,7 +42,7 @@ uses
   MSBuildCommand,
   TestCommand;
 
-constructor TAutoTestThread.Create;
+constructor TAutoTestThread.Create(const ANotification: INotification);
 begin
   inherited Create(true);
   FreeOnTerminate := true;
@@ -52,7 +53,7 @@ begin
   FUseBuildXML := False;
   FBuildXMLFilePath := '';
 
-  FTestEngine := TActiveObjectEngine.Create;
+  FTestEngine := TActiveObjectEngine.Create(ANotification);
   FDirWatcher := TDirectoryMonitor.Create;
 end;
 

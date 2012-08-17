@@ -4,27 +4,27 @@ interface
 
 uses
   Forms,
-  GrowlNotification,
   Windows,
   ActiveObjectEngine;
 
 type
   TNotificationIcon = (niSuccess, niError);
 
-  TTestCommand = class(TInterfacedObject, ICommand)
-  private
-    FEngine: TActiveObjectEngine;
+  TTestCommand = class(TCommand)
+  strict private
     FTestProject: string;
     FDCC32Path: string;
-    procedure ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
-  public
-    constructor Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
-    procedure Execute;
     function ExecAndWait(
       ExecuteFile, ParamString, StartInDirectory: string;
       var AExitCode: DWORD;
       var AErrorCode: Integer;
       var Output: string): Boolean;
+  public
+    constructor Create(
+      AEngine: TActiveObjectEngine;
+      ATestProject: string;
+      ADCC32Path: string);
+    procedure Execute; override;
   end;
 
 implementation
@@ -32,14 +32,14 @@ implementation
 uses
   Classes,
   SysUtils,
-  PrjConst;
+  PrjConst,
+  Notification;
 
-constructor TTestCommand.Create(Engine: TActiveObjectEngine; TestProject: string; DCC32Path: string);
+constructor TTestCommand.Create(AEngine: TActiveObjectEngine; ATestProject: string; ADCC32Path: string);
 begin
-  inherited Create;
-  FEngine := Engine;
-  FTestProject := TestProject;
-  FDCC32Path := DCC32Path;
+  inherited Create(Engine);
+  FTestProject := ATestProject;
+  FDCC32Path := ADCC32Path;
 end;
 
 procedure TTestCommand.Execute;
@@ -117,38 +117,6 @@ begin
 
 
   ShowNotification(balloonTitle, text, output, balloonIcon);
-end;
-
-procedure TTestCommand.ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
-var
-  notifier: TGrowlNotification;
-begin
-  notifier := TGrowlNotification.Create;
-  try
-    try
-      try
-        if Icon = ntSuccess then
-          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN)
-        else
-          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
-
-        Writeln(Text);
-        if Trim(ConsoleOutput) <> EmptyStr then
-        begin
-          Writeln;
-          Writeln(ConsoleOutput);
-        end;
-
-        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED or FOREGROUND_GREEN or FOREGROUND_BLUE);
-      except
-      end;
-
-      notifier.SendNotification(Title, Trim(StringReplace(Text, CRLF, LF, [rfReplaceAll])), icon);
-    except
-    end;
-  finally
-    FreeAndNil(notifier);
-  end;
 end;
 
 function TTestCommand.ExecAndWait(

@@ -5,7 +5,7 @@ interface
 uses
   Forms,
   xmlintf,
-  GrowlNotification,
+
   Windows,
   TUTrayIcon,
   ActiveObjectEngine;
@@ -13,16 +13,13 @@ uses
 type
   TNotificationIcon = (niSuccess, niError);
 
-  TMSBuildCommand = class(TInterfacedObject, ICommand)
-  private
-    FEngine: TActiveObjectEngine;
+  TMSBuildCommand = class(TCommand)
+  strict private
     FConfigFile: string;
     FBuildCommand: string;
     FBuildParams: string;
     FTestCommand: string;
     FTestParams: string;
-
-    procedure ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
 
     function LoadConfig: Boolean;
     procedure SetEnvironment(const ANode: IXMLNode);
@@ -36,8 +33,8 @@ type
       var AErrorCode: Integer;
       var Output: string): Boolean;
   public
-    constructor Create(Engine: TActiveObjectEngine; ConfigFile: string);
-    procedure Execute;
+    constructor Create(AEngine: TActiveObjectEngine; AConfigFile: string);
+    procedure Execute; override;
   end;
 
 implementation
@@ -48,13 +45,15 @@ uses
   Classes,
   Variants,
   SysUtils,
-  PrjConst;
+  PrjConst,
+  Notification;
 
-constructor TMSBuildCommand.Create(Engine: TActiveObjectEngine; ConfigFile: string);
+constructor TMSBuildCommand.Create(
+  AEngine: TActiveObjectEngine;
+  AConfigFile: string);
 begin
-  inherited Create;
-  FEngine := Engine;
-  FConfigFile := ConfigFile;
+  inherited Create(AEngine);
+  FConfigFile := AConfigFile;
 end;
 
 procedure TMSBuildCommand.Execute;
@@ -418,40 +417,5 @@ begin
     CloseHandle(StdOutPipeW);
   end;
 end;
-
-
-procedure TMSBuildCommand.ShowNotification(Title, Text, ConsoleOutput: String; Icon: TNotificationType);
-var
-  notifier: TGrowlNotification;
-begin
-  notifier := TGrowlNotification.Create;
-  try
-    try
-      try
-        if Icon = ntSuccess then
-          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN)
-        else
-          SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
-
-        Writeln(Text);
-        if Trim(ConsoleOutput) <> EmptyStr then
-        begin
-          Writeln;
-          Writeln(ConsoleOutput);
-        end;
-
-        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED or FOREGROUND_GREEN or FOREGROUND_BLUE);
-      except
-      end;
-
-      notifier.SendNotification(Title, Trim(StringReplace(Text, CRLF, LF, [rfReplaceAll])), icon);
-    except
-    end;
-  finally
-    FreeAndNil(notifier);
-  end;
-end;
-
-
 
 end.

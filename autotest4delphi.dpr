@@ -13,10 +13,14 @@ uses
   ActiveObjectEngine in 'ActiveObjectEngine.pas',
   DirWatcher in 'DirWatcher.pas',
   TestCommand in 'TestCommand.pas',
-  GrowlNotification in 'GrowlNotification.pas',
+  GrowlNotifier in 'GrowlNotifier.pas',
   PrjConst in 'PrjConst.pas',
   AutoTestThread in 'AutoTestThread.pas',
-  MSBuildCommand in 'MSBuildCommand.pas';
+  MSBuildCommand in 'MSBuildCommand.pas',
+  Notification in 'Notification.pas',
+  GrowlNotification in 'GrowlNotification.pas',
+  ConsoleNotification in 'ConsoleNotification.pas',
+  ComposedNotification in 'ComposedNotification.pas';
 
 var
   // MainController : IController;
@@ -151,10 +155,10 @@ end;
 
 procedure GrowlNotify(const AMessage: string);
 var
-  growl: TGrowlNotification;
+  growl: TGrowlNotifier;
 begin
   try
-    growl := TGrowlNotification.Create;
+    growl := TGrowlNotifier.Create;
     try
       growl.SendNotification('Autotest4Delphi', AMessage, ntNotify);
     finally
@@ -166,12 +170,12 @@ end;
 
 var
   registered: Boolean;
-  growl: TGrowlNotification;
+  growl: TGrowlNotifier;
 
 begin
   registered := False;
   try
-    growl := TGrowlNotification.Create;
+    growl := TGrowlNotifier.Create;
     try
       try
         growl.RegisterApplication;
@@ -205,7 +209,11 @@ begin
     SetConsoleCtrlHandler(@console_handler, true);
     FTerminate := false;
 
-    FAutoTestThread := TAutoTestThread.Create;
+    FAutoTestThread := TAutoTestThread.Create(
+      TComposedNotification.Create
+        .AddNotifier(TConsoleNotification.Create)
+        .AddNotifier(TGrowlNotification.Create)
+      );
     FAutoTestThread.DirectoryToWatch := FDirectoryToWatch;
     FAutoTestThread.TestProject := FTestProject;
     FAutoTestThread.DCC32ExePath := FDCC32ExePath;
