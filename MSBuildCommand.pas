@@ -266,14 +266,14 @@ begin
     exit;
 
   ACommand := node.NodeValue;
-  ACommand := StringReplace(ACommand, '%CD%', ExcludeTrailingPathDelimiter(ExtractFilePath(FConfigFile)), [rfReplaceAll, rfIgnoreCase]);
+  ACommand := ExpandEnvVars(StringReplace(ACommand, '%CD%', ExcludeTrailingPathDelimiter(ExtractFilePath(FConfigFile)), [rfReplaceAll, rfIgnoreCase]));
 
   node := ANode.ChildNodes.FindNode('params');
   if Assigned(node)
   and not VarIsEmpty(node.NodeValue)
   and not VarIsNull(node.NodeValue) then
     AParams := node.NodeValue;
-  AParams := StringReplace(AParams, '%CD%', ExcludeTrailingPathDelimiter(ExtractFilePath(FConfigFile)), [rfReplaceAll, rfIgnoreCase]);
+  AParams := ExpandEnvVars(StringReplace(AParams, '%CD%', ExcludeTrailingPathDelimiter(ExtractFilePath(FConfigFile)), [rfReplaceAll, rfIgnoreCase]));
 
   Result := True;
 end;

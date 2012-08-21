@@ -52,6 +52,19 @@ begin
     result := FALSE;
 end;
 
+function ExpandEnvString(const APath: string): string;
+var
+  bufferSize: Cardinal;
+begin
+  Result := APath;
+  bufferSize := ExpandEnvironmentStrings(PChar(APath), nil, 0);
+  if bufferSize > 0 then
+  begin
+    SetLength(Result, bufferSize - 1);
+    ExpandEnvironmentStrings(PChar(APath), PChar(Result), bufferSize);
+  end;
+end;
+
 function LoadIni: Byte;
 var
   ini: TMemInifile;
@@ -60,7 +73,7 @@ begin
   iniFileName := EmptyStr;
   
   if (ParamCount = 1) then
-    iniFileName := ParamStr(1)
+    iniFileName := ExpandEnvString(ParamStr(1))
   else
     iniFileName := C_INI_NAME;
 
@@ -78,7 +91,7 @@ begin
         begin
           FBuildXMLFilePath := '';
           if ini.ValueExists(C_INI_SECTION, 'BuildXMLPath') then
-            FBuildXMLFilePath := ini.ReadString(C_INI_SECTION, 'BuildXMLPath', '');
+            FBuildXMLFilePath := ExpandEnvString(ini.ReadString(C_INI_SECTION, 'BuildXMLPath', ''));
 
           if FileExists(FBuildXMLFilePath) then
             Result := 0
@@ -93,17 +106,17 @@ begin
         begin
           if ini.ValueExists(C_INI_SECTION, 'TestProject') then
           begin
-            FTestProject := ini.ReadString(C_INI_SECTION, 'TestProject', EmptyStr);
+            FTestProject := ExpandEnvString(ini.ReadString(C_INI_SECTION, 'TestProject', EmptyStr));
             if FileExists(FTestProject) then
             begin
               if ini.ValueExists(C_INI_SECTION, 'DirectoryToWatch') then
               begin
-                FDirectoryToWatch := ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr);
+                FDirectoryToWatch := ExpandEnvString(ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr));
                 if DirectoryExists(FDirectoryToWatch) then
                 begin
                   if ini.ValueExists(C_INI_SECTION, 'DCC32Exe') then
                   begin
-                    FDCC32ExePath := ini.ReadString(C_INI_SECTION, 'DCC32Exe', EmptyStr);
+                    FDCC32ExePath := ExpandEnvString(ini.ReadString(C_INI_SECTION, 'DCC32Exe', EmptyStr));
                     if FileExists(FDCC32ExePath) then
                     begin
                       if (LowerCase(ExtractFileName(FDCC32ExePath)) = 'dcc32.exe') then
@@ -133,7 +146,7 @@ begin
         begin
           if ini.ValueExists(C_INI_SECTION, 'DirectoryToWatch') then
           begin
-            FDirectoryToWatch := ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr);
+            FDirectoryToWatch := ExpandEnvString(ini.ReadString(C_INI_SECTION, 'DirectoryToWatch', EmptyStr));
             if DirectoryExists(FDirectoryToWatch) then
               Result := 0
             else
