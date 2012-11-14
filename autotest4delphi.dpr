@@ -32,10 +32,25 @@ var
   FBuildXMLFilePath: string;
   FTerminate: Boolean;
   LoadResult: Byte;
+  FCurrentDir: string;
 
 const
   C_INI_NAME = 'autotest.ini';
   C_INI_SECTION = 'autotest';
+
+function GetCurrentDirectory: string;
+begin
+  if FCurrentDir = EmptyStr then
+  begin
+    if (ParamCount = 1) then
+      FCurrentDir := Trim(ExtractFilePath(ParamStr(1)));
+
+    if FCurrentDir = EmptyStr then
+      FCurrentDir := Trim(ExtractFilePath(ParamStr(0)));
+  end;
+
+  Result := FCurrentDir;
+end;
 
 function console_handler( dwCtrlType: DWORD ): BOOL; stdcall;
 begin
@@ -63,6 +78,13 @@ begin
     SetLength(Result, bufferSize - 1);
     ExpandEnvironmentStrings(PChar(APath), PChar(Result), bufferSize);
   end;
+
+  Result := StringReplace(
+    Result,
+    '%CD%',
+    ExcludeTrailingPathDelimiter(GetCurrentDirectory),
+    [rfReplaceAll, rfIgnoreCase]
+  );
 end;
 
 function LoadIni: Byte;
@@ -71,11 +93,13 @@ var
   iniFileName: string;
 begin
   iniFileName := EmptyStr;
-  
+  FCurrentDir := EmptyStr;
+
   if (ParamCount = 1) then
     iniFileName := ExpandEnvString(ParamStr(1))
   else
     iniFileName := C_INI_NAME;
+
 
   if FileExists(iniFileName) then
   begin
